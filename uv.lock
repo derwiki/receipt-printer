@@ -30,6 +30,8 @@ python-barcode==0.15.1
     # via python-escpos
 python-escpos==3.1
     # via -r requirements.in
+python-multipart==0.0.20
+    # via -r requirements.in
 pyyaml==6.0.2
     # via python-escpos
 qrcode==8.2
