@@ -1,5 +1,8 @@
 fastapi
-uvicorn
+httpx
 pillow
+pyserial
+pytest
 python-escpos
 python-multipart
+uvicorn

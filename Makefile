@@ -24,3 +24,6 @@ run-dummy:
 
 run-real:
 	source $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=false $(UVICORN_CMD)
+
+test:
+	source .venv/bin/activate && pytest test_main.py
