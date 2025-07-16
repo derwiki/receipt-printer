@@ -27,3 +27,9 @@ run-real:
 
 test:
 	source .venv/bin/activate && pytest test_main.py
+
+format:
+	source $(VENV_DIR)/bin/activate && black .
+
+lint:
+	source $(VENV_DIR)/bin/activate && ruff check .

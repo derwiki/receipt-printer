@@ -6,3 +6,5 @@ pytest
 python-escpos
 python-multipart
 uvicorn
+black
+ruff

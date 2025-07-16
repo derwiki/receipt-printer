@@ -7,6 +7,7 @@ from escpos.printer import Serial, Dummy
 
 app = FastAPI()
 
+
 def get_printer():
     use_dummy = os.getenv("USE_PRINTER_DUMMY", "false").lower() == "true"
     if use_dummy:
@@ -15,13 +16,14 @@ def get_printer():
     else:
         return Serial(devfile="/dev/usb/lp0", baudrate=9600, timeout=1)
 
+
 def get_printer_instance():
     return get_printer()
 
+
 @app.post("/print", response_class=PlainTextResponse)
 async def print_image(
-    file: UploadFile = File(...),
-    printer=Depends(get_printer_instance)
+    file: UploadFile = File(...), printer=Depends(get_printer_instance)
 ):
     if file.content_type not in ["image/jpeg", "image/png"]:
         return PlainTextResponse("Unsupported file type", status_code=400)
@@ -33,7 +35,9 @@ async def print_image(
 
         # Process image
         image = Image.open(tmp.name).convert("1")
-        image = image.resize((384, int(image.height * (384 / image.width))), Image.Resampling.LANCZOS)
+        image = image.resize(
+            (384, int(image.height * (384 / image.width))), Image.Resampling.LANCZOS
+        )
 
         # Use the injected printer
         p = printer
