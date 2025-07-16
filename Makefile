@@ -1,20 +1,26 @@
 VENV_DIR := .venv
-REQUIREMENTS := requirements.in
 LOCKFILE := uv.lock
+REQUIREMENTS := requirements.in
+UVICORN_CMD := uvicorn main:app --host 0.0.0.0 --port 8000
 
-# Install dependencies from uv.lock (reproducible)
 install:
 	uv venv $(VENV_DIR)
 	source $(VENV_DIR)/bin/activate && uv pip sync $(LOCKFILE)
 
-# Compile uv.lock from requirements.in
 lock:
 	uv pip compile $(REQUIREMENTS) > $(LOCKFILE)
 
-# Create requirements.in from current venv (if needed)
 freeze:
-	source $(VENV_DIR)/bin/activate && uv pip freeze > requirements.in
+	source $(VENV_DIR)/bin/activate && uv pip freeze > $(REQUIREMENTS)
 
-# Remove virtual environment
 clean:
 	rm -rf $(VENV_DIR)
+
+run:
+	source $(VENV_DIR)/bin/activate && $(UVICORN_CMD)
+
+run-dummy:
+	source $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=true $(UVICORN_CMD)
+
+run-real:
+	source $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=false $(UVICORN_CMD)
