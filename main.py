@@ -1,7 +1,7 @@
 import os
 import tempfile
 from fastapi import FastAPI, UploadFile, File, Depends
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
 from PIL import Image, ImageOps, ImageEnhance
 from escpos.printer import Dummy, Usb
 
@@ -57,6 +57,24 @@ def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
     return image.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
+@app.get("/", response_class=HTMLResponse)
+def index():
+    return """
+    <html>
+        <head>
+            <title>Receipt Printer</title>
+        </head>
+        <body>
+            <h1>Upload an Image to Print</h1>
+            <form action=\"/print\" method=\"post\" enctype=\"multipart/form-data\">
+                <input type=\"file\" name=\"file\" accept=\"image/png, image/jpeg\" required><br><br>
+                <button type=\"submit\">Print</button>
+            </form>
+        </body>
+    </html>
+    """
+
+
 @app.post("/print", response_class=PlainTextResponse)
 async def print_image(
     file: UploadFile = File(...), printer=Depends(get_printer_instance)
@@ -82,6 +100,8 @@ async def print_image(
         if isinstance(p, Dummy):
             with open("output.escpos", "wb") as f:
                 f.write(p.output)
-            return "Printed to dummy printer. ESC/POS bytes saved to output.escpos"
+            # Redirect to / after printing
+            return RedirectResponse(url="/", status_code=303)
 
-    return "Printed successfully."
+    # Redirect to / after printing
+    return RedirectResponse(url="/", status_code=303)
