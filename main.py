@@ -114,9 +114,9 @@ async def print_image(
 
         # Use the injected printer
         p = printer
+        p.text("\n")
         p.image(image)
         p.text("\n")
-        p.text("-" * 32 + "\n\n\n")
         p.cut()
 
         if isinstance(p, Dummy):
