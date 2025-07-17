@@ -21,11 +21,11 @@ def test_print_endpoint_with_dummy():
     test_image.seek(0)
 
     response = client.post(
-        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}
+        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}, follow_redirects=False
     )
 
-    assert response.status_code == 200
-    assert "Printed" in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
 
     app.dependency_overrides = {}  # Cleanup
 
@@ -53,10 +53,10 @@ def test_print_endpoint_with_real_printer_mock(monkeypatch):
     test_image.seek(0)
 
     response = client.post(
-        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}
+        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}, follow_redirects=False
     )
 
-    assert response.status_code == 200
-    assert "Printed" in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
 
     app.dependency_overrides = {}
