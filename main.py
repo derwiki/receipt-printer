@@ -2,10 +2,17 @@ import os
 import tempfile
 import logging
 from functools import wraps
-from fastapi import FastAPI, UploadFile, File, Depends, Form
-from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Depends, Request
+from fastapi.responses import (
+    PlainTextResponse,
+    HTMLResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
+from io import BytesIO
+import uuid
 
 app = FastAPI()
 
@@ -67,6 +74,7 @@ def handle_printer_exceptions(endpoint_func):
         except Exception as e:
             logging.exception("Printer error in endpoint")
             return PlainTextResponse(f"Printer error: {e}", status_code=500)
+
     return wrapper
 
 
@@ -119,3 +127,131 @@ async def print_image(
 
     # Redirect to / after printing
     return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/banner", response_class=HTMLResponse)
+def banner_form():
+    return """
+    <html>
+        <head><title>Banner Generator</title></head>
+        <body>
+            <h1>Banner Text Generator</h1>
+            <form action=\"/banner/preview\" method=\"post\">
+                <input type=\"text\" name=\"text\" placeholder=\"Enter banner text\" required>
+                <button type=\"submit\">Preview Banner</button>
+            </form>
+        </body>
+    </html>
+    """
+
+
+# In-memory store for banner images by token
+banner_images = {}
+
+
+@app.post("/banner/preview", response_class=HTMLResponse)
+async def banner_preview(request: Request):
+    form = await request.form()
+    text = form.get("text", "")
+    width = 2048  # Arbitrary wide width for banner
+    height = 576
+    bg = "white"
+    fg = "black"
+    # Find a scalable TTF font
+    font_path = None
+    possible_fonts = [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Verdana.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/Users/adam/Library/Fonts/FreeSans.ttf",
+        "/Users/adam/Library/Fonts/FreeSerif.ttf",
+    ]
+    for path in possible_fonts:
+        if os.path.exists(path):
+            font_path = path
+            break
+    if font_path is None:
+        return PlainTextResponse(
+            "No TTF font found on system. Please install Arial or DejaVuSans.",
+            status_code=500,
+        )
+    # Binary search for largest font size that fits height
+    min_size = 10
+    max_size = height
+    best_size = min_size
+    while min_size <= max_size:
+        mid = (min_size + max_size) // 2
+        font = ImageFont.truetype(font_path, mid)
+        dummy_img = Image.new("L", (10, 10))
+        dummy_draw = ImageDraw.Draw(dummy_img)
+        bbox = dummy_draw.textbbox((0, 0), text, font=font)
+        text_height = bbox[3] - bbox[1]
+        if text_height <= height * 0.95:
+            best_size = mid
+            min_size = mid + 1
+        else:
+            max_size = mid - 1
+    font = ImageFont.truetype(font_path, best_size)
+    dummy_img = Image.new("L", (10, 10))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+    bbox = dummy_draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    temp_img = Image.new("RGBA", (text_width, text_height), (0, 0, 0, 0))
+    temp_draw = ImageDraw.Draw(temp_img)
+    temp_draw.text((-bbox[0], -bbox[1]), text, font=font, fill=fg)
+    image = Image.new("RGB", (max(text_width, width), height), bg)
+    x = (image.width - text_width) // 2
+    y = (height - text_height) // 2
+    image.paste(temp_img, (x, y), mask=temp_img.split()[-1])
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+    # Store image in memory with a token
+    token = str(uuid.uuid4())
+    banner_images[token] = buf.getvalue()
+    # Render HTML with image and print button
+    return HTMLResponse(
+        f"""
+    <html>
+        <head><title>Banner Preview</title></head>
+        <body>
+            <h1>Banner Preview</h1>
+            <img src="/banner/image?token={token}" style="border:1px solid #ccc; max-width:100%;"><br><br>
+            <form id="printForm" action="/print" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="token" value="{token}">
+                <input type="hidden" name="filename" value="banner.png">
+                <button type="button" onclick="submitPrint()">Print</button>
+            </form>
+            <script>
+            function submitPrint() {{
+                fetch('/banner/image?token={token}')
+                  .then(resp => resp.blob())
+                  .then(blob => {{
+                    const form = document.getElementById('printForm');
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.name = 'file';
+                    const dt = new DataTransfer();
+                    dt.items.add(new File([blob], 'banner.png', {{type: 'image/png'}}));
+                    fileInput.files = dt.files;
+                    form.appendChild(fileInput);
+                    form.submit();
+                  }});
+            }}
+            </script>
+        </body>
+    </html>
+    """
+    )
+
+
+@app.get("/banner/image")
+def banner_image(token: str):
+    img_bytes = banner_images.get(token)
+    if not img_bytes:
+        return PlainTextResponse("Image not found", status_code=404)
+    return StreamingResponse(BytesIO(img_bytes), media_type="image/png")
