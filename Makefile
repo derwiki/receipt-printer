@@ -32,4 +32,4 @@ format:
 	source $(VENV_DIR)/bin/activate && black .
 
 lint:
-	source $(VENV_DIR)/bin/activate && ruff check .
+	source $(VENV_DIR)/bin/activate && ruff check . --fix

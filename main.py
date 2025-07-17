@@ -2,8 +2,8 @@ import os
 import tempfile
 from fastapi import FastAPI, UploadFile, File, Depends
 from fastapi.responses import PlainTextResponse
-from PIL import Image
-from escpos.printer import Serial, Dummy
+from PIL import Image, ImageOps, ImageEnhance
+from escpos.printer import Dummy, Usb
 
 app = FastAPI()
 
@@ -14,11 +14,47 @@ def get_printer():
         print("⚠️  Using dummy printer")
         return Dummy()
     else:
-        return Serial(devfile="/dev/usb/lp0", baudrate=9600, timeout=1)
+        return Usb(0x0FE6, 0x811E)
 
 
 def get_printer_instance():
     return get_printer()
+
+
+def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
+    """
+    Prepare a PIL Image for thermal receipt printing.
+
+    - Rotates landscape images to portrait orientation
+    - Resizes to target width (preserving aspect ratio)
+    - Converts to grayscale
+    - Boosts contrast and brightness
+    - Applies Floyd–Steinberg dithering to binary
+
+    Args:
+        image (Image.Image): Original PIL image (any mode)
+        width (int): Target printable width in pixels
+
+    Returns:
+        Image.Image: Dithered 1-bit image ready for ESC/POS printing
+    """
+    # Rotate if image is landscape
+    if image.width > image.height:
+        image = image.rotate(90, expand=True)
+
+    # Resize to target width
+    aspect = width / image.width
+    image = image.resize((width, int(image.height * aspect)), Image.LANCZOS)
+
+    # Grayscale
+    image = ImageOps.grayscale(image)
+
+    # Optional tone adjustments
+    image = ImageEnhance.Contrast(image).enhance(1.5)
+    image = ImageEnhance.Brightness(image).enhance(1.1)
+
+    # Dither
+    return image.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
 @app.post("/print", response_class=PlainTextResponse)
@@ -33,17 +69,13 @@ async def print_image(
         tmp.write(content)
         tmp.flush()
 
-        # Process image
-        image = Image.open(tmp.name).convert("1")
-        image = image.resize(
-            (384, int(image.height * (384 / image.width))), Image.Resampling.LANCZOS
-        )
+        original = Image.open(tmp.name)
+        image = prepare_thermal_image(original, width=576)
 
         # Use the injected printer
         p = printer
         p.image(image)
-        p.text("\nWhat do you think this drawing shows?\n")
-        p.text("Write your story here:\n")
+        p.text("\n")
         p.text("-" * 32 + "\n\n\n")
         p.cut()
 
