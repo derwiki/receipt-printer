@@ -1,8 +1,10 @@
 import os
 import tempfile
-from fastapi import FastAPI, UploadFile, File, Depends
-from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse
-from PIL import Image, ImageOps, ImageEnhance
+import logging
+from functools import wraps
+from fastapi import FastAPI, UploadFile, File, Depends, Form
+from fastapi.responses import PlainTextResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
 
 app = FastAPI()
@@ -57,6 +59,17 @@ def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
     return image.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
+def handle_printer_exceptions(endpoint_func):
+    @wraps(endpoint_func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await endpoint_func(*args, **kwargs)
+        except Exception as e:
+            logging.exception("Printer error in endpoint")
+            return PlainTextResponse(f"Printer error: {e}", status_code=500)
+    return wrapper
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     return """
@@ -76,6 +89,7 @@ def index():
 
 
 @app.post("/print", response_class=PlainTextResponse)
+@handle_printer_exceptions
 async def print_image(
     file: UploadFile = File(...), printer=Depends(get_printer_instance)
 ):
