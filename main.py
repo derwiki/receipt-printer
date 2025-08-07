@@ -2,6 +2,13 @@ import os
 import tempfile
 import logging
 from functools import wraps
+
+# Configure logging to output to STDOUT
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],  # This outputs to STDOUT
+)
 from fastapi import FastAPI, UploadFile, File, Depends, Request, Form
 from fastapi.responses import (
     PlainTextResponse,

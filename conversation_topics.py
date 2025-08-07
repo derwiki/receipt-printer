@@ -1,11 +1,14 @@
-"""
-GPT-powered conversation topic generation module.
-"""
-
 import os
 import logging
 from typing import Optional
 from openai import OpenAI
+
+# Configure logging to output to STDOUT
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],  # This outputs to STDOUT
+)
 
 # Static base prompt that gets prepended to all user requests
 BASE_PROMPT = """Generate 15 conversation prompts for me and my wife that match the tone and style we've used previously: emotionally grounded but lightly playful, introspective without being heavy, and attuned to the everyday realities of life with young kids. Prioritize depth over novelty—questions that reveal growth, shared values, small joys, or evolving connection. We're thoughtful, dry-humored, and candid, with a preference for prompts that feel personal, specific, and gently surprising. Keep them low-effort to engage with, high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing. IMPORTANT: Do not use any emojis, unicode symbols, or special characters - only plain ASCII text."""
@@ -24,7 +27,7 @@ class ConversationTopicGenerator:
             )
 
         self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4"  # Change to "gpt-3.5-turbo" if cost is a concern
+        self.model = "gpt-4.1-nano"
 
     def generate_topics(
         self, user_prompt: Optional[str] = None, timeout: int = 30
@@ -45,7 +48,10 @@ class ConversationTopicGenerator:
         # Construct the full prompt
         full_prompt = BASE_PROMPT
         if user_prompt and user_prompt.strip():
+            full_prompt += "\n\nTHIS IS VERY IMPORTANT: the user has specified that beyond base instructions, it should be influenced by these additional instructions:\n"
             full_prompt += f" {user_prompt.strip()}"
+
+        logging.info(f"Full prompt: {full_prompt}")
 
         try:
             logging.info(f"Calling OpenAI API with model: {self.model}")
@@ -118,7 +124,11 @@ class ConversationTopicGenerator:
             ASCII-only text safe for thermal printing
         """
         # Keep only ASCII printable characters (32-126) plus newlines and tabs
-        return ''.join(char for char in text if ord(char) < 128 and (char.isprintable() or char in '\n\t'))
+        return "".join(
+            char
+            for char in text
+            if ord(char) < 128 and (char.isprintable() or char in "\n\t")
+        )
 
 
 # Convenience function for easy importing
