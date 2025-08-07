@@ -8,7 +8,7 @@ from typing import Optional
 from openai import OpenAI
 
 # Static base prompt that gets prepended to all user requests
-BASE_PROMPT = """Generate 15 conversation prompts for me and my wife that match the tone and style we've used previously: emotionally grounded but lightly playful, introspective without being heavy, and attuned to the everyday realities of life with young kids. Prioritize depth over novelty—questions that reveal growth, shared values, small joys, or evolving connection. We're thoughtful, dry-humored, and candid, with a preference for prompts that feel personal, specific, and gently surprising. Keep them low-effort to engage with, high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing."""
+BASE_PROMPT = """Generate 15 conversation prompts for me and my wife that match the tone and style we've used previously: emotionally grounded but lightly playful, introspective without being heavy, and attuned to the everyday realities of life with young kids. Prioritize depth over novelty—questions that reveal growth, shared values, small joys, or evolving connection. We're thoughtful, dry-humored, and candid, with a preference for prompts that feel personal, specific, and gently surprising. Keep them low-effort to engage with, high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing. IMPORTANT: Do not use any emojis, unicode symbols, or special characters - only plain ASCII text."""
 
 
 class ConversationTopicGenerator:
@@ -81,8 +81,11 @@ class ConversationTopicGenerator:
         Returns:
             Clean, formatted text suitable for receipt printer
         """
-        # Basic cleaning - remove extra whitespace, ensure ASCII-safe
-        lines = text.split("\n")
+        # Strip any emojis and non-ASCII characters
+        ascii_text = self._strip_non_ascii(text)
+
+        # Basic cleaning - remove extra whitespace
+        lines = ascii_text.split("\n")
         cleaned_lines = []
 
         for line in lines:
@@ -100,9 +103,22 @@ class ConversationTopicGenerator:
         formatted = "\n".join(cleaned_lines)
 
         # Add header and footer spacing for thermal printing
-        formatted = f"\n🧠 CONVERSATION TOPICS\n{'='*40}\n\n{formatted}\n\n{'='*40}\n"
+        formatted = f"\nCONVERSATION TOPICS\n{'='*40}\n\n{formatted}\n\n{'='*40}\n"
 
         return formatted
+
+    def _strip_non_ascii(self, text: str) -> str:
+        """
+        Remove non-ASCII characters including emojis.
+
+        Args:
+            text: Input text that may contain emojis or unicode
+
+        Returns:
+            ASCII-only text safe for thermal printing
+        """
+        # Keep only ASCII printable characters (32-126) plus newlines and tabs
+        return ''.join(char for char in text if ord(char) < 128 and (char.isprintable() or char in '\n\t'))
 
 
 # Convenience function for easy importing

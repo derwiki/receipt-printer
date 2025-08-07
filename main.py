@@ -141,7 +141,7 @@ async def print_image(
             logging.error(f"Failed to generate topics, using fallback: {e}")
             # Fallback to original static topics if OpenAI fails
             conversation_text = """
-🧠 CONVERSATION TOPICS (FALLBACK)
+CONVERSATION TOPICS (FALLBACK)
 ========================================
 
 1. What's a small choice we made that quietly shaped our life in a big way?
