@@ -1,15 +1,18 @@
-# Receipt Printer API
+# Receipt Printer API with AI Conversation Topics
 
 ![Sample Output](samples.jpg)
 
-This is a FastAPI-based HTTP API that accepts image uploads and prints them to a thermal receipt printer (e.g. Rongta RP326).  
+This is a FastAPI-based HTTP API that generates AI-powered conversation topics and optionally prints them alongside images to a thermal receipt printer (e.g. Rongta RP326). Uses OpenAI's GPT models to create personalized conversation prompts for couples with young kids.
+
 Supports both real printer output and dummy mode for testing and development.
 
 ## Requirements
 
 - Python 3.11+
 - [`uv`](https://github.com/astral-sh/uv) for Python dependency and environment management
+- `pyusb` (required for USB printer connection)
 - `pyserial` (required only for real serial printing)
+- OpenAI API key (for conversation topic generation)
 - `cloudflared` (optional, for public HTTPS exposure)
 
 ## Setup Instructions
@@ -28,7 +31,15 @@ source .venv/bin/activate
 uv pip sync uv.lock
 ```
 
-### 2. To regenerate the lockfile (optional)
+### 2. Set up OpenAI API key
+
+```bash
+export OPENAI_API_KEY='your-openai-api-key-here'
+```
+
+Add this to your shell profile (`.bashrc`, `.zshrc`, etc.) to make it persistent.
+
+### 3. To regenerate the lockfile (optional)
 
 ```bash
 make lock
@@ -52,21 +63,43 @@ This will render ESC/POS output to `output.escpos`.
 make run-real
 ```
 
-If `pyserial` is not installed, do:
+## AI Conversation Topic Generation
 
-```bash
-uv pip install pyserial
-make lock
-```
+### Web Interface
 
-## Printing an Image
+Visit [http://localhost:8000/](http://localhost:8000/) in your browser to access the conversation topic generator:
 
-Use `curl` to send a file to the `/print` endpoint:
+1. **Optional Image**: Upload an image to print alongside the topics
+2. **Optional Topic Focus**: Enter guidance like "make them about travel" or "focus on parenting"
+3. **Generate**: Click "Print with AI Conversation Topics" to generate and print
 
+### API Usage
+
+#### Generate topics with image:
 ```bash
 curl -X POST http://localhost:8000/print \
-  -F "file=@drawing.jpg"
+  -F "file=@drawing.jpg" \
+  -F "user_prompt=make them about travel"
 ```
+
+#### Generate topics without image:
+```bash
+curl -X POST http://localhost:8000/print \
+  -F "user_prompt=focus on our future dreams"
+```
+
+#### Generate with default base prompt only:
+```bash
+curl -X POST http://localhost:8000/print
+```
+
+### Conversation Topic Features
+
+- **Base Prompt**: Hardcoded prompt optimized for couples with young kids - emotionally grounded, lightly playful, and introspective
+- **User Customization**: Optional text input to guide topic focus (e.g., "about travel", "parenting challenges")
+- **Fallback System**: If OpenAI API fails, falls back to static conversation topics
+- **Thermal-Safe Output**: All text is ASCII-only, no emojis or special characters that could break thermal printers
+- **Model**: Uses GPT-4 (configurable to GPT-3.5-turbo in `conversation_topics.py` for cost savings)
 
 ## Testing
 
@@ -115,12 +148,13 @@ Banner generation requires a TrueType font (TTF) such as Arial or Verdana. The a
 
 ```
 .
-├── main.py            # FastAPI app with /print, /banner, and related endpoints
-├── test_main.py       # Unit tests
-├── requirements.in    # Top-level declared dependencies
-├── uv.lock            # Locked transitive dependencies
-├── Makefile           # Run targets (install, test, run)
-├── output.escpos      # ESC/POS bytes written in dummy mode
+├── main.py                   # FastAPI app with /print, /banner, and related endpoints
+├── conversation_topics.py    # OpenAI GPT integration for conversation topic generation
+├── test_main.py             # Unit tests
+├── requirements.in          # Top-level declared dependencies
+├── uv.lock                  # Locked transitive dependencies
+├── Makefile                 # Run targets (install, test, run)
+├── output.escpos            # ESC/POS bytes written in dummy mode
 ```
 
 ## Environment Variables
@@ -128,6 +162,7 @@ Banner generation requires a TrueType font (TTF) such as Arial or Verdana. The a
 | Variable            | Purpose                              |
 |---------------------|--------------------------------------|
 | `USE_PRINTER_DUMMY` | Set to `true` to use Dummy printer   |
+| `OPENAI_API_KEY`    | Required: Your OpenAI API key for GPT conversation topic generation |
 
 ## Example Use Case
 
