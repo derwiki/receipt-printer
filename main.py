@@ -68,17 +68,18 @@ def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
     return image.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
-def print_image_and_text(printer, image: Image.Image, text: str):
+def print_image_and_text(printer, image: Optional[Image.Image], text: str):
     """
     Print both an image and text to the receipt printer.
 
     Args:
         printer: ESC/POS printer instance (Dummy or Usb)
-        image: Prepared thermal image (1-bit PIL Image)
+        image: Prepared thermal image (1-bit PIL Image) or None
         text: Text content to print after the image
     """
     printer.text("\n")
-    printer.image(image)
+    if image is not None:
+        printer.image(image)
     printer.text(text)
     printer.cut()
 
@@ -103,9 +104,10 @@ def index():
             <title>Receipt Printer</title>
         </head>
         <body>
-            <h1>Upload an Image to Print</h1>
+            <h1>Generate Conversation Topics</h1>
             <form action=\"/print\" method=\"post\" enctype=\"multipart/form-data\">
-                <input type=\"file\" name=\"file\" accept=\"image/png, image/jpeg\" required><br><br>
+                <label for=\"file_input\">Optional image to print with topics:</label><br>
+                <input type=\"file\" name=\"file\" id=\"file_input\" accept=\"image/png, image/jpeg\"><br><br>
                 <label for=\"prompt_input\">Optional topic focus (e.g., \"make them about travel\"):</label><br>
                 <input type=\"text\" name=\"user_prompt\" id=\"prompt_input\" placeholder=\"Enter optional topic guidance...\" style=\"width: 400px;\"><br><br>
                 <button type=\"submit\">Print with AI Conversation Topics</button>
@@ -118,29 +120,33 @@ def index():
 @app.post("/print", response_class=PlainTextResponse)
 @handle_printer_exceptions
 async def print_image(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     user_prompt: Optional[str] = Form(None),
     printer=Depends(get_printer_instance),
 ):
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        return PlainTextResponse("Unsupported file type", status_code=400)
+    image = None
 
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        content = await file.read()
-        tmp.write(content)
-        tmp.flush()
+    # Process image if provided
+    if file and file.filename:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            return PlainTextResponse("Unsupported file type", status_code=400)
 
-        original = Image.open(tmp.name)
-        image = prepare_thermal_image(original, width=576)
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp.flush()
 
-        # Generate conversation topics using OpenAI
-        try:
-            logging.info("Generating conversation topics...")
-            conversation_text = generate_conversation_topics(user_prompt)
-        except Exception as e:
-            logging.error(f"Failed to generate topics, using fallback: {e}")
-            # Fallback to original static topics if OpenAI fails
-            conversation_text = """
+            original = Image.open(tmp.name)
+            image = prepare_thermal_image(original, width=576)
+
+    # Generate conversation topics using OpenAI
+    try:
+        logging.info("Generating conversation topics...")
+        conversation_text = generate_conversation_topics(user_prompt)
+    except Exception as e:
+        logging.error(f"Failed to generate topics, using fallback: {e}")
+        # Fallback to original static topics if OpenAI fails
+        conversation_text = """
 CONVERSATION TOPICS (FALLBACK)
 ========================================
 
@@ -161,14 +167,14 @@ CONVERSATION TOPICS (FALLBACK)
 15. What's a part of our story we might underestimate, but will probably mean a lot in hindsight?
 
 ========================================
-            """
+        """
 
-        # Print image and generated text
-        print_image_and_text(printer, image, conversation_text)
+    # Print image and generated text (image may be None)
+    print_image_and_text(printer, image, conversation_text)
 
-        if isinstance(printer, Dummy):
-            with open("output.escpos", "wb") as f:
-                f.write(printer.output)
+    if isinstance(printer, Dummy):
+        with open("output.escpos", "wb") as f:
+            f.write(printer.output)
 
     # Redirect to / after printing
     return RedirectResponse(url="/", status_code=303)
