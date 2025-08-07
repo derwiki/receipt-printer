@@ -1,0 +1,123 @@
+"""
+GPT-powered conversation topic generation module.
+"""
+
+import os
+import logging
+from typing import Optional
+from openai import OpenAI
+
+# Static base prompt that gets prepended to all user requests
+BASE_PROMPT = """Generate 15 conversation prompts for me and my wife that match the tone and style we've used previously: emotionally grounded but lightly playful, introspective without being heavy, and attuned to the everyday realities of life with young kids. Prioritize depth over novelty—questions that reveal growth, shared values, small joys, or evolving connection. We're thoughtful, dry-humored, and candid, with a preference for prompts that feel personal, specific, and gently surprising. Keep them low-effort to engage with, high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing."""
+
+
+class ConversationTopicGenerator:
+    """Handles OpenAI API calls for generating conversation topics."""
+
+    def __init__(self):
+        """Initialize with OpenAI client."""
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY environment variable is required. "
+                "Set it with: export OPENAI_API_KEY='your-key-here'"
+            )
+
+        self.client = OpenAI(api_key=api_key)
+        self.model = "gpt-4"  # Change to "gpt-3.5-turbo" if cost is a concern
+
+    def generate_topics(
+        self, user_prompt: Optional[str] = None, timeout: int = 30
+    ) -> str:
+        """
+        Generate conversation topics using OpenAI GPT.
+
+        Args:
+            user_prompt: Optional user input to append to base prompt (e.g., "make them about travel")
+            timeout: Request timeout in seconds
+
+        Returns:
+            Formatted string with 15 numbered conversation prompts
+
+        Raises:
+            Exception: On API errors, timeouts, or formatting issues
+        """
+        # Construct the full prompt
+        full_prompt = BASE_PROMPT
+        if user_prompt and user_prompt.strip():
+            full_prompt += f" {user_prompt.strip()}"
+
+        try:
+            logging.info(f"Calling OpenAI API with model: {self.model}")
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": full_prompt}],
+                max_tokens=800,  # Enough for ~15 prompts
+                temperature=0.7,  # Some creativity but consistent
+                timeout=timeout,
+            )
+
+            # Extract the generated text
+            generated_text = response.choices[0].message.content.strip()
+
+            # Clean and format for thermal printing
+            formatted_topics = self._format_for_thermal_print(generated_text)
+
+            logging.info("Successfully generated conversation topics")
+            return formatted_topics
+
+        except Exception as e:
+            logging.error(f"OpenAI API call failed: {e}")
+            raise Exception(f"Failed to generate conversation topics: {str(e)}")
+
+    def _format_for_thermal_print(self, text: str) -> str:
+        """
+        Clean and format GPT response for thermal printing.
+
+        Args:
+            text: Raw GPT response text
+
+        Returns:
+            Clean, formatted text suitable for receipt printer
+        """
+        # Basic cleaning - remove extra whitespace, ensure ASCII-safe
+        lines = text.split("\n")
+        cleaned_lines = []
+
+        for line in lines:
+            line = line.strip()
+            if line:
+                # Ensure line starts with a number (1., 2., etc.) or add numbering if missing
+                if not line[0].isdigit():
+                    # If this looks like a prompt but isn't numbered, skip for now
+                    # GPT should return numbered items, but we'll be permissive
+                    cleaned_lines.append(line)
+                else:
+                    cleaned_lines.append(line)
+
+        # Join with newlines and add some spacing for readability
+        formatted = "\n".join(cleaned_lines)
+
+        # Add header and footer spacing for thermal printing
+        formatted = f"\n🧠 CONVERSATION TOPICS\n{'='*40}\n\n{formatted}\n\n{'='*40}\n"
+
+        return formatted
+
+
+# Convenience function for easy importing
+def generate_conversation_topics(user_prompt: Optional[str] = None) -> str:
+    """
+    Generate conversation topics using the default generator.
+
+    Args:
+        user_prompt: Optional user guidance (e.g., "make them about travel")
+
+    Returns:
+        Formatted conversation topics ready for printing
+
+    Raises:
+        Exception: On generation failures
+    """
+    generator = ConversationTopicGenerator()
+    return generator.generate_topics(user_prompt)

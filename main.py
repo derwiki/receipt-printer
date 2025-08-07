@@ -2,7 +2,7 @@ import os
 import tempfile
 import logging
 from functools import wraps
-from fastapi import FastAPI, UploadFile, File, Depends, Request
+from fastapi import FastAPI, UploadFile, File, Depends, Request, Form
 from fastapi.responses import (
     PlainTextResponse,
     HTMLResponse,
@@ -13,6 +13,8 @@ from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
 from io import BytesIO
 import uuid
+from typing import Optional
+from conversation_topics import generate_conversation_topics
 
 app = FastAPI()
 
@@ -66,6 +68,21 @@ def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
     return image.convert("1", dither=Image.FLOYDSTEINBERG)
 
 
+def print_image_and_text(printer, image: Image.Image, text: str):
+    """
+    Print both an image and text to the receipt printer.
+
+    Args:
+        printer: ESC/POS printer instance (Dummy or Usb)
+        image: Prepared thermal image (1-bit PIL Image)
+        text: Text content to print after the image
+    """
+    printer.text("\n")
+    printer.image(image)
+    printer.text(text)
+    printer.cut()
+
+
 def handle_printer_exceptions(endpoint_func):
     @wraps(endpoint_func)
     async def wrapper(*args, **kwargs):
@@ -89,7 +106,9 @@ def index():
             <h1>Upload an Image to Print</h1>
             <form action=\"/print\" method=\"post\" enctype=\"multipart/form-data\">
                 <input type=\"file\" name=\"file\" accept=\"image/png, image/jpeg\" required><br><br>
-                <button type=\"submit\">Print</button>
+                <label for=\"prompt_input\">Optional topic focus (e.g., \"make them about travel\"):</label><br>
+                <input type=\"text\" name=\"user_prompt\" id=\"prompt_input\" placeholder=\"Enter optional topic guidance...\" style=\"width: 400px;\"><br><br>
+                <button type=\"submit\">Print with AI Conversation Topics</button>
             </form>
         </body>
     </html>
@@ -99,7 +118,9 @@ def index():
 @app.post("/print", response_class=PlainTextResponse)
 @handle_printer_exceptions
 async def print_image(
-    file: UploadFile = File(...), printer=Depends(get_printer_instance)
+    file: UploadFile = File(...),
+    user_prompt: Optional[str] = Form(None),
+    printer=Depends(get_printer_instance),
 ):
     if file.content_type not in ["image/jpeg", "image/png"]:
         return PlainTextResponse("Unsupported file type", status_code=400)
@@ -112,18 +133,42 @@ async def print_image(
         original = Image.open(tmp.name)
         image = prepare_thermal_image(original, width=576)
 
-        # Use the injected printer
-        p = printer
-        p.text("\n")
-        p.image(image)
-        p.text("\n")
-        p.cut()
+        # Generate conversation topics using OpenAI
+        try:
+            logging.info("Generating conversation topics...")
+            conversation_text = generate_conversation_topics(user_prompt)
+        except Exception as e:
+            logging.error(f"Failed to generate topics, using fallback: {e}")
+            # Fallback to original static topics if OpenAI fails
+            conversation_text = """
+🧠 CONVERSATION TOPICS (FALLBACK)
+========================================
 
-        if isinstance(p, Dummy):
+1. What's a small choice we made that quietly shaped our life in a big way?
+2. What's something we've adapted to that used to feel like a dealbreaker?
+3. What's a way we've helped each other become more ourselves?
+4. What's something about you that's hard to explain but you know I get?
+5. What's one way we've protected each other's energy lately?
+6. What's a tension we've figured out how to live with instead of fix?
+7. What's something we've made easier for each other — even if it's still hard?
+8. What's one thing I do that reminds you we're on the same team?
+9. What's something we're learning together, even if we're learning it slowly?
+10. What's something that's still hard to say out loud, but getting easier?
+11. What's a moment when you realized we'd changed — in a good way?
+12. What's something you're holding onto right now that you don't want to rush past?
+13. What's a shared memory that still teaches you something?
+14. What's one truth we've earned the right to hold, just by going through life together?
+15. What's a part of our story we might underestimate, but will probably mean a lot in hindsight?
+
+========================================
+            """
+
+        # Print image and generated text
+        print_image_and_text(printer, image, conversation_text)
+
+        if isinstance(printer, Dummy):
             with open("output.escpos", "wb") as f:
-                f.write(p.output)
-            # Redirect to / after printing
-            return RedirectResponse(url="/", status_code=303)
+                f.write(printer.output)
 
     # Redirect to / after printing
     return RedirectResponse(url="/", status_code=303)

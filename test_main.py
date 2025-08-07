@@ -21,7 +21,9 @@ def test_print_endpoint_with_dummy():
     test_image.seek(0)
 
     response = client.post(
-        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}, follow_redirects=False
+        "/print",
+        files={"file": ("test.jpg", test_image, "image/jpeg")},
+        follow_redirects=False,
     )
 
     assert response.status_code == 303
@@ -53,7 +55,9 @@ def test_print_endpoint_with_real_printer_mock(monkeypatch):
     test_image.seek(0)
 
     response = client.post(
-        "/print", files={"file": ("test.jpg", test_image, "image/jpeg")}, follow_redirects=False
+        "/print",
+        files={"file": ("test.jpg", test_image, "image/jpeg")},
+        follow_redirects=False,
     )
 
     assert response.status_code == 303
