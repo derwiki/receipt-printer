@@ -5,6 +5,7 @@ UVICORN_CMD := uvicorn main:app --host 0.0.0.0 --port 8000
 
 install:
 	uv venv $(VENV_DIR)
+	. $(VENV_DIR)/bin/activate && uv pip install -r requirements.in
 	. $(VENV_DIR)/bin/activate && uv pip sync $(LOCKFILE)
 
 lock:
