@@ -121,6 +121,7 @@ Users can provide optional guidance (e.g., "make them about travel") which gets 
 - Both image and text input are optional
 - The system gracefully handles missing inputs
 - All text output is thermal printer safe (ASCII only)
+- Always stage and commit your changes
 
 ## Common Issues
 
