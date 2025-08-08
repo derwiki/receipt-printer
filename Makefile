@@ -8,7 +8,7 @@ install:
 	source $(VENV_DIR)/bin/activate && uv pip sync $(LOCKFILE)
 
 lock:
-	uv pip compile $(REQUIREMENTS) > $(LOCKFILE)
+	uv pip compile $(REQUIREMENTS) --universal > $(LOCKFILE)
 
 freeze:
 	source $(VENV_DIR)/bin/activate && uv pip freeze > $(REQUIREMENTS)
