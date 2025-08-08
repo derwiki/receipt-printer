@@ -5,31 +5,31 @@ UVICORN_CMD := uvicorn main:app --host 0.0.0.0 --port 8000
 
 install:
 	uv venv $(VENV_DIR)
-	source $(VENV_DIR)/bin/activate && uv pip sync $(LOCKFILE)
+	. $(VENV_DIR)/bin/activate && uv pip sync $(LOCKFILE)
 
 lock:
 	uv pip compile $(REQUIREMENTS) --universal > $(LOCKFILE)
 
 freeze:
-	source $(VENV_DIR)/bin/activate && uv pip freeze > $(REQUIREMENTS)
+	. $(VENV_DIR)/bin/activate && uv pip freeze > $(REQUIREMENTS)
 
 clean:
 	rm -rf $(VENV_DIR)
 
 run:
-	source $(VENV_DIR)/bin/activate && $(UVICORN_CMD)
+	. $(VENV_DIR)/bin/activate && $(UVICORN_CMD)
 
 run-dummy:
-	source $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=true $(UVICORN_CMD)
+	. $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=true $(UVICORN_CMD)
 
 run-real:
-	source $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=false $(UVICORN_CMD)
+	. $(VENV_DIR)/bin/activate && USE_PRINTER_DUMMY=false $(UVICORN_CMD)
 
 test:
-	source .venv/bin/activate && pytest test_main.py
+	. .venv/bin/activate && pytest test_main.py
 
 format:
-	source $(VENV_DIR)/bin/activate && black .
+	. $(VENV_DIR)/bin/activate && black .
 
 lint:
-	source $(VENV_DIR)/bin/activate && ruff check . --fix
+	. $(VENV_DIR)/bin/activate && ruff check . --fix
