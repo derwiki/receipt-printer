@@ -10,3 +10,5 @@ black
 ruff
 openai
 pyusb
+pytz
+exceptiongroup
