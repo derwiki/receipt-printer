@@ -9,13 +9,14 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],  # This outputs to STDOUT
 )
-from fastapi import FastAPI, UploadFile, File, Depends, Request, Form
+from fastapi import FastAPI, UploadFile, File, Depends, Request, Form, Query
 from fastapi.responses import (
     PlainTextResponse,
     HTMLResponse,
     RedirectResponse,
     StreamingResponse,
 )
+import urllib.parse
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
 from io import BytesIO
@@ -153,20 +154,35 @@ def handle_printer_exceptions(endpoint_func):
 
 
 @app.get("/", response_class=HTMLResponse)
-def index():
-    return """
+def index(success: bool = Query(False), conversation_text: str = Query("")):
+    success_html = ""
+    if success and conversation_text:
+        # Decode URL-encoded conversation text
+        decoded_text = urllib.parse.unquote_plus(conversation_text)
+        success_html = f"""
+            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                <h2>✅ Success! Topics printed successfully!</h2>
+                <details>
+                    <summary style="cursor: pointer; font-weight: bold;">View Generated Conversation Topics</summary>
+                    <pre style="background-color: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 3px; white-space: pre-wrap;">{decoded_text}</pre>
+                </details>
+            </div>
+        """
+    
+    return f"""
     <html>
         <head>
             <title>Receipt Printer</title>
         </head>
         <body>
             <h1>Generate Conversation Topics</h1>
-            <form action=\"/print\" method=\"post\" enctype=\"multipart/form-data\">
-                <label for=\"file_input\">Optional image to print with topics:</label><br>
-                <input type=\"file\" name=\"file\" id=\"file_input\" accept=\"image/png, image/jpeg\"><br><br>
-                <label for=\"prompt_input\">Optional topic focus (e.g., \"make them about travel\"):</label><br>
-                <input type=\"text\" name=\"user_prompt\" id=\"prompt_input\" placeholder=\"Enter optional topic guidance...\" style=\"width: 400px;\"><br><br>
-                <button type=\"submit\">Print with AI Conversation Topics</button>
+            {success_html}
+            <form action="/print" method="post" enctype="multipart/form-data">
+                <label for="file_input">Optional image to print with topics:</label><br>
+                <input type="file" name="file" id="file_input" accept="image/png, image/jpeg"><br><br>
+                <label for="prompt_input">Optional topic focus (e.g., "make them about travel"):</label><br>
+                <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance..." style="width: 400px;"><br><br>
+                <button type="submit">Print with AI Conversation Topics</button>
             </form>
         </body>
     </html>
@@ -202,9 +218,16 @@ async def print_image(
     except Exception as e:
         logging.error(f"Failed to generate topics, using fallback: {e}")
         # Fallback to original static topics if OpenAI fails
-        conversation_text = """
+        from datetime import datetime
+        import pytz
+        
+        pdt = pytz.timezone('America/Los_Angeles')
+        today = datetime.now(pdt).strftime("%B %d, %Y")
+        
+        conversation_text = f"""
 CONVERSATION TOPICS (FALLBACK)
 ========================================
+Printed on: {today}
 
 1. What's a small choice we made that quietly shaped our life in a big way?
 2. What's something we've adapted to that used to feel like a dealbreaker?
@@ -232,8 +255,10 @@ CONVERSATION TOPICS (FALLBACK)
         with open("output.escpos", "wb") as f:
             f.write(printer.output)
 
-    # Redirect to / after printing
-    return RedirectResponse(url="/", status_code=303)
+    # Redirect to / with success message and conversation text
+    encoded_conversation_text = urllib.parse.quote_plus(conversation_text)
+    success_url = f"/?success=true&conversation_text={encoded_conversation_text}"
+    return RedirectResponse(url=success_url, status_code=303)
 
 
 @app.get("/banner", response_class=HTMLResponse)

@@ -108,8 +108,15 @@ class ConversationTopicGenerator:
         # Join with newlines and add some spacing for readability
         formatted = "\n".join(cleaned_lines)
 
+        # Add date line
+        from datetime import datetime
+        import pytz
+        
+        pdt = pytz.timezone('America/Los_Angeles')
+        today = datetime.now(pdt).strftime("%B %d, %Y")
+        
         # Add header and footer spacing for thermal printing
-        formatted = f"\nCONVERSATION TOPICS\n{'='*40}\n\n{formatted}\n\n{'='*40}\n"
+        formatted = f"\nCONVERSATION TOPICS\n{'='*40}\nPrinted on: {today}\n\n{formatted}\n\n{'='*40}\n"
 
         return formatted
 
