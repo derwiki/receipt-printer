@@ -26,13 +26,57 @@ from conversation_topics import generate_conversation_topics
 app = FastAPI()
 
 
+def get_usb_printer():
+    """
+    Auto-detect USB thermal printer or use known fallback IDs.
+
+    Returns:
+        Usb: ESC/POS USB printer instance
+    """
+    import usb.core
+
+    # Known thermal printer vendor IDs (common ones)
+    known_thermal_vendors = [
+        0x0FE6,  # Your original Rongta printer
+        0x04B8,  # Epson
+        0x154F,  # Wincor Nixdorf
+        0x0DD4,  # Deltaco Electronics
+        0x20D1,  # Unknown thermal printer vendor
+        0x0416,  # Winbond Electronics Corp
+    ]
+
+    try:
+        # Find all USB devices
+        devices = usb.core.find(find_all=True)
+
+        for device in devices:
+            # Check if it's a known thermal printer vendor
+            if device.idVendor in known_thermal_vendors:
+                logging.info(f"Found potential thermal printer: {device.idVendor:04x}:{device.idProduct:04x}")
+                try:
+                    return Usb(device.idVendor, device.idProduct)
+                except Exception as e:
+                    logging.warning(f"Failed to connect to printer {device.idVendor:04x}:{device.idProduct:04x}: {e}")
+                    continue
+
+        # If no known vendors found, try the original IDs as fallback
+        logging.info("No auto-detected printers found, trying original IDs...")
+        return Usb(0x0FE6, 0x811E)
+
+    except Exception as e:
+        logging.error(f"USB detection failed: {e}")
+        # Fallback to original hardcoded IDs
+        return Usb(0x0FE6, 0x811E)
+
+
 def get_printer():
     use_dummy = os.getenv("USE_PRINTER_DUMMY", "false").lower() == "true"
     if use_dummy:
         print("⚠️  Using dummy printer")
         return Dummy()
     else:
-        return Usb(0x0FE6, 0x811E)
+        # Try to auto-detect thermal printer or fall back to known IDs
+        return get_usb_printer()
 
 
 def get_printer_instance():
