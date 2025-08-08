@@ -23,12 +23,8 @@ Supports both real printer output and dummy mode for testing and development.
 git clone https://github.com/yourname/receipt-printer.git
 cd receipt-printer
 
-# Create isolated virtual environment
-uv venv
-source .venv/bin/activate
-
-# Install dependencies from lockfile
-uv pip sync uv.lock
+# Install dependencies and set up environment
+make install
 ```
 
 ### 2. Set up OpenAI API key
@@ -45,7 +41,7 @@ Add this to your shell profile (`.bashrc`, `.zshrc`, etc.) to make it persistent
 make lock
 ```
 
-This reads from `requirements.in` and creates a new `uv.lock`.
+This reads from `requirements.in` and creates a cross-platform compatible `uv.lock` using the `--universal` flag for better compatibility across different operating systems.
 
 ## Running the Server
 
@@ -72,6 +68,7 @@ Visit [http://localhost:8000/](http://localhost:8000/) in your browser to access
 1. **Optional Image**: Upload an image to print alongside the topics
 2. **Optional Topic Focus**: Enter guidance like "make them about travel" or "focus on parenting"
 3. **Generate**: Click "Print with AI Conversation Topics" to generate and print
+4. **Success Feedback**: After printing, you'll see a success message with the generated conversation topics displayed on the page
 
 ### API Usage
 
@@ -99,7 +96,43 @@ curl -X POST http://localhost:8000/print
 - **User Customization**: Optional text input to guide topic focus (e.g., "about travel", "parenting challenges")
 - **Fallback System**: If OpenAI API fails, falls back to static conversation topics
 - **Thermal-Safe Output**: All text is ASCII-only, no emojis or special characters that could break thermal printers
+- **Date Stamps**: All printed topics include the current date for reference
 - **Model**: Uses GPT-4 (configurable to GPT-3.5-turbo in `conversation_topics.py` for cost savings)
+
+## Hardware Setup
+
+### USB Printer Detection
+
+The application automatically detects compatible USB thermal printers from known vendors including:
+- Rongta (0x0FE6) - Original target printer
+- Epson (0x04B8)
+- Wincor Nixdorf (0x154F)
+- Deltaco Electronics (0x0DD4)
+
+If no compatible printer is found, it falls back to the original Rongta printer IDs (0x0FE6:0x811E).
+
+### Linux USB Permissions
+
+On Linux systems, you may need to set up USB permissions for the thermal printer:
+
+```bash
+# Find your printer's USB IDs
+lsusb
+
+# Create udev rule (replace with your printer's IDs)
+sudo tee /etc/udev/rules.d/99-thermal-printer.rules <<EOF
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0fe6", ATTRS{idProduct}=="811e", MODE="0666", GROUP="dialout"
+EOF
+
+# Add your user to dialout group
+sudo usermod -a -G dialout $USER
+
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Logout and login (or reboot) to apply group changes
+```
 
 ## Testing
 
@@ -152,8 +185,9 @@ Banner generation requires a TrueType font (TTF) such as Arial or Verdana. The a
 ├── conversation_topics.py    # OpenAI GPT integration for conversation topic generation
 ├── test_main.py             # Unit tests
 ├── requirements.in          # Top-level declared dependencies
-├── uv.lock                  # Locked transitive dependencies
-├── Makefile                 # Run targets (install, test, run)
+├── uv.lock                  # Cross-platform locked transitive dependencies
+├── Makefile                 # Run targets (install, test, run) with shell compatibility
+├── CLAUDE.md                # Development context and instructions for AI assistants
 ├── output.escpos            # ESC/POS bytes written in dummy mode
 ```
 
