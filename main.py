@@ -128,11 +128,16 @@ def print_image_and_text(printer, image: Optional[Image.Image], text: str):
         image: Prepared thermal image (1-bit PIL Image) or None
         text: Text content to print after the image
     """
-    printer.text("\n")
-    if image is not None:
-        printer.image(image)
-    printer.text(text)
-    printer.cut()
+    try:
+        printer.text("\n")
+        if image is not None:
+            printer.image(image)
+        printer.text(text)
+        printer.cut()
+    finally:
+        # Always close the printer connection to prevent "Resource busy" errors
+        if hasattr(printer, 'close'):
+            printer.close()
 
 
 def handle_printer_exceptions(endpoint_func):
