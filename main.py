@@ -29,12 +29,12 @@ app = FastAPI()
 def get_usb_printer():
     """
     Auto-detect USB thermal printer or use known fallback IDs.
-
+    
     Returns:
         Usb: ESC/POS USB printer instance
     """
     import usb.core
-
+    
     # Known thermal printer vendor IDs (common ones)
     known_thermal_vendors = [
         0x0FE6,  # Your original Rongta printer
@@ -44,11 +44,11 @@ def get_usb_printer():
         0x20D1,  # Unknown thermal printer vendor
         0x0416,  # Winbond Electronics Corp
     ]
-
+    
     try:
         # Find all USB devices
         devices = usb.core.find(find_all=True)
-
+        
         for device in devices:
             # Check if it's a known thermal printer vendor
             if device.idVendor in known_thermal_vendors:
@@ -58,11 +58,11 @@ def get_usb_printer():
                 except Exception as e:
                     logging.warning(f"Failed to connect to printer {device.idVendor:04x}:{device.idProduct:04x}: {e}")
                     continue
-
+        
         # If no known vendors found, try the original IDs as fallback
         logging.info("No auto-detected printers found, trying original IDs...")
         return Usb(0x0FE6, 0x811E)
-
+        
     except Exception as e:
         logging.error(f"USB detection failed: {e}")
         # Fallback to original hardcoded IDs
