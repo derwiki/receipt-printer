@@ -30,12 +30,12 @@ app = FastAPI()
 def get_usb_printer():
     """
     Auto-detect USB thermal printer or use known fallback IDs.
-    
+
     Returns:
         Usb: ESC/POS USB printer instance
     """
     import usb.core
-    
+
     # Known thermal printer vendor IDs (common ones)
     known_thermal_vendors = [
         0x0FE6,  # Your original Rongta printer
@@ -45,25 +45,29 @@ def get_usb_printer():
         0x20D1,  # Unknown thermal printer vendor
         0x0416,  # Winbond Electronics Corp
     ]
-    
+
     try:
         # Find all USB devices
         devices = usb.core.find(find_all=True)
-        
+
         for device in devices:
             # Check if it's a known thermal printer vendor
             if device.idVendor in known_thermal_vendors:
-                logging.info(f"Found potential thermal printer: {device.idVendor:04x}:{device.idProduct:04x}")
+                logging.info(
+                    f"Found potential thermal printer: {device.idVendor:04x}:{device.idProduct:04x}"
+                )
                 try:
                     return Usb(device.idVendor, device.idProduct)
                 except Exception as e:
-                    logging.warning(f"Failed to connect to printer {device.idVendor:04x}:{device.idProduct:04x}: {e}")
+                    logging.warning(
+                        f"Failed to connect to printer {device.idVendor:04x}:{device.idProduct:04x}: {e}"
+                    )
                     continue
-        
+
         # If no known vendors found, try the original IDs as fallback
         logging.info("No auto-detected printers found, trying original IDs...")
         return Usb(0x0FE6, 0x811E)
-        
+
     except Exception as e:
         logging.error(f"USB detection failed: {e}")
         # Fallback to original hardcoded IDs
@@ -138,7 +142,7 @@ def print_image_and_text(printer, image: Optional[Image.Image], text: str):
         printer.cut()
     finally:
         # Always close the printer connection to prevent "Resource busy" errors
-        if hasattr(printer, 'close'):
+        if hasattr(printer, "close"):
             printer.close()
 
 
@@ -157,7 +161,7 @@ def handle_printer_exceptions(endpoint_func):
 @app.get("/", response_class=HTMLResponse)
 def index(success: bool = Query(False), conversation_text: str = Query("")):
     from conversation_topics import BASE_PROMPT
-    
+
     success_html = ""
     if success and conversation_text:
         # Decode URL-encoded conversation text
@@ -171,7 +175,7 @@ def index(success: bool = Query(False), conversation_text: str = Query("")):
                 </details>
             </div>
         """
-    
+
     return f"""
     <html>
         <head>
@@ -228,10 +232,10 @@ async def print_image(
         # Fallback to original static topics if OpenAI fails
         from datetime import datetime
         import pytz
-        
-        pdt = pytz.timezone('America/Los_Angeles')
+
+        pdt = pytz.timezone("America/Los_Angeles")
         today = datetime.now(pdt).strftime("%B %d, %Y")
-        
+
         conversation_text = f"""
 CONVERSATION TOPICS (FALLBACK)
 ========================================

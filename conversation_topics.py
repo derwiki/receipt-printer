@@ -57,7 +57,10 @@ class ConversationTopicGenerator:
         self.model = "gpt-4.1-nano"
 
     def generate_topics(
-        self, user_prompt: Optional[str] = None, system_prompt: Optional[str] = None, timeout: int = 30
+        self,
+        user_prompt: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        timeout: int = 30,
     ) -> str:
         """
         Generate conversation topics using OpenAI GPT.
@@ -74,7 +77,9 @@ class ConversationTopicGenerator:
             Exception: On API errors, timeouts, or formatting issues
         """
         # Construct the full prompt
-        full_prompt = system_prompt if system_prompt and system_prompt.strip() else BASE_PROMPT
+        full_prompt = (
+            system_prompt if system_prompt and system_prompt.strip() else BASE_PROMPT
+        )
         if user_prompt and user_prompt.strip():
             full_prompt += "\n\nTHIS IS VERY IMPORTANT: the user has specified that beyond base instructions, it should be influenced by these additional instructions:\n"
             full_prompt += f" {user_prompt.strip()}"
@@ -139,10 +144,10 @@ class ConversationTopicGenerator:
         # Add date line
         from datetime import datetime
         import pytz
-        
-        pdt = pytz.timezone('America/Los_Angeles')
+
+        pdt = pytz.timezone("America/Los_Angeles")
         today = datetime.now(pdt).strftime("%B %d, %Y")
-        
+
         # Add header and footer spacing for thermal printing
         formatted = f"\nCONVERSATION TOPICS\n{'='*40}\nPrinted on: {today}\n\n{formatted}\n\n{'='*40}\n"
 
@@ -167,7 +172,9 @@ class ConversationTopicGenerator:
 
 
 # Convenience function for easy importing
-def generate_conversation_topics(user_prompt: Optional[str] = None, system_prompt: Optional[str] = None) -> str:
+def generate_conversation_topics(
+    user_prompt: Optional[str] = None, system_prompt: Optional[str] = None
+) -> str:
     """
     Generate conversation topics using the default generator.
 
