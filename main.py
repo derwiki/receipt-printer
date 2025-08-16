@@ -155,6 +155,8 @@ def handle_printer_exceptions(endpoint_func):
 
 @app.get("/", response_class=HTMLResponse)
 def index(success: bool = Query(False), conversation_text: str = Query("")):
+    from conversation_topics import BASE_PROMPT
+    
     success_html = ""
     if success and conversation_text:
         # Decode URL-encoded conversation text
@@ -180,6 +182,10 @@ def index(success: bool = Query(False), conversation_text: str = Query("")):
             <form action="/print" method="post" enctype="multipart/form-data">
                 <label for="file_input">Optional image to print with topics:</label><br>
                 <input type="file" name="file" id="file_input" accept="image/png, image/jpeg"><br><br>
+                
+                <label for="system_prompt_input">System prompt:</label><br>
+                <textarea name="system_prompt" id="system_prompt_input" style="width: 600px; height: 150px;">{BASE_PROMPT}</textarea><br><br>
+                
                 <label for="prompt_input">Optional topic focus (e.g., "make them about travel"):</label><br>
                 <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance..." style="width: 400px;"><br><br>
                 <button type="submit">Print with AI Conversation Topics</button>
@@ -194,6 +200,7 @@ def index(success: bool = Query(False), conversation_text: str = Query("")):
 async def print_image(
     file: Optional[UploadFile] = File(None),
     user_prompt: Optional[str] = Form(None),
+    system_prompt: Optional[str] = Form(None),
     printer=Depends(get_printer_instance),
 ):
     image = None
@@ -214,7 +221,7 @@ async def print_image(
     # Generate conversation topics using OpenAI
     try:
         logging.info("Generating conversation topics...")
-        conversation_text = generate_conversation_topics(user_prompt)
+        conversation_text = generate_conversation_topics(user_prompt, system_prompt)
     except Exception as e:
         logging.error(f"Failed to generate topics, using fallback: {e}")
         # Fallback to original static topics if OpenAI fails

@@ -30,13 +30,14 @@ class ConversationTopicGenerator:
         self.model = "gpt-4.1-nano"
 
     def generate_topics(
-        self, user_prompt: Optional[str] = None, timeout: int = 30
+        self, user_prompt: Optional[str] = None, system_prompt: Optional[str] = None, timeout: int = 30
     ) -> str:
         """
         Generate conversation topics using OpenAI GPT.
 
         Args:
             user_prompt: Optional user input to append to base prompt (e.g., "make them about travel")
+            system_prompt: Optional custom system prompt to use instead of BASE_PROMPT
             timeout: Request timeout in seconds
 
         Returns:
@@ -46,7 +47,7 @@ class ConversationTopicGenerator:
             Exception: On API errors, timeouts, or formatting issues
         """
         # Construct the full prompt
-        full_prompt = BASE_PROMPT
+        full_prompt = system_prompt if system_prompt and system_prompt.strip() else BASE_PROMPT
         if user_prompt and user_prompt.strip():
             full_prompt += "\n\nTHIS IS VERY IMPORTANT: the user has specified that beyond base instructions, it should be influenced by these additional instructions:\n"
             full_prompt += f" {user_prompt.strip()}"
@@ -139,12 +140,13 @@ class ConversationTopicGenerator:
 
 
 # Convenience function for easy importing
-def generate_conversation_topics(user_prompt: Optional[str] = None) -> str:
+def generate_conversation_topics(user_prompt: Optional[str] = None, system_prompt: Optional[str] = None) -> str:
     """
     Generate conversation topics using the default generator.
 
     Args:
         user_prompt: Optional user guidance (e.g., "make them about travel")
+        system_prompt: Optional custom system prompt to use instead of BASE_PROMPT
 
     Returns:
         Formatted conversation topics ready for printing
@@ -153,4 +155,4 @@ def generate_conversation_topics(user_prompt: Optional[str] = None) -> str:
         Exception: On generation failures
     """
     generator = ConversationTopicGenerator()
-    return generator.generate_topics(user_prompt)
+    return generator.generate_topics(user_prompt, system_prompt)
