@@ -101,9 +101,10 @@ def prepare_thermal_image(image: Image.Image, width: int = 576) -> Image.Image:
     Returns:
         Image.Image: Dithered 1-bit image ready for ESC/POS printing
     """
+    # TODO(2025-08-16): disable rotate images to portrait orientation
     # Rotate if image is landscape
-    if image.width > image.height:
-        image = image.rotate(90, expand=True)
+    # if image.width > image.height:
+    #    image = image.rotate(90, expand=True)
 
     # Resize to target width
     aspect = width / image.width
