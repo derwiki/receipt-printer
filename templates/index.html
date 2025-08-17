@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Conversation Topics{% endblock %}
+
+{% block content %}
+<h1>Generate Conversation Topics</h1>
+
+{% if success and conversation_text %}
+<div class="success">
+    <h2>✅ Success! Topics printed successfully!</h2>
+    <details>
+        <summary style="cursor: pointer; font-weight: bold;">View Generated Conversation Topics</summary>
+        <pre style="background-color: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 3px; white-space: pre-wrap;">{{ conversation_text }}</pre>
+    </details>
+</div>
+{% endif %}
+
+<form action="/print" method="post" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="file_input">Optional image to print with topics:</label>
+        <input type="file" name="file" id="file_input" accept="image/png, image/jpeg">
+    </div>
+    
+    <div class="form-group">
+        <label for="system_prompt_input">System prompt:</label>
+        <textarea name="system_prompt" id="system_prompt_input" style="height: 150px;">{{ base_prompt }}</textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="prompt_input">Optional topic focus (e.g., "make them about travel"):</label>
+        <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance...">
+    </div>
+
+    <div class="form-group">
+        <label for="raw_text_input">Raw text (if provided, ignores AI generation and system prompt):</label>
+        <textarea name="raw_text" id="raw_text_input" placeholder="Enter text to print directly..." style="height: 100px;"></textarea>
+    </div>
+
+    <button type="submit">Print with AI Conversation Topics</button>
+</form>
+{% endblock %} 

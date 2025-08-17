@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Banner Preview{% endblock %}
+
+{% block content %}
+<h1>Banner Preview</h1>
+<img src="/banner/image?token={{ token }}" style="border:1px solid #ccc; max-width:100%;"><br><br>
+<form id="printForm" action="/print" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="filename" value="banner.png">
+    <button type="button" onclick="submitPrint()">Print</button>
+</form>
+<script>
+function submitPrint() {
+    fetch('/banner/image?token={{ token }}')
+      .then(resp => resp.blob())
+      .then(blob => {
+        const form = document.getElementById('printForm');
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.name = 'file';
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'banner.png', {type: 'image/png'}));
+        fileInput.files = dt.files;
+        form.appendChild(fileInput);
+        form.submit();
+      });
+}
+</script>
+{% endblock %} 

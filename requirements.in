@@ -12,3 +12,4 @@ openai
 pyusb
 pytz
 exceptiongroup
+jinja2

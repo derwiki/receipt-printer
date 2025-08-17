@@ -14,6 +14,7 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
+from fastapi.templating import Jinja2Templates
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
 
@@ -27,6 +28,9 @@ logging.basicConfig(
 )
 
 app = FastAPI()
+
+# Set up templates
+templates = Jinja2Templates(directory="templates")
 
 
 def get_usb_printer():
@@ -162,49 +166,25 @@ def handle_printer_exceptions(endpoint_func):
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(success: bool = Query(False), conversation_text: str = Query("")):
+def index(
+    request: Request, success: bool = Query(False), conversation_text: str = Query("")
+):
     from conversation_topics import BASE_PROMPT
 
-    success_html = ""
+    decoded_text = ""
     if success and conversation_text:
         # Decode URL-encoded conversation text
         decoded_text = urllib.parse.unquote_plus(conversation_text)
-        success_html = f"""
-            <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-                <h2>✅ Success! Topics printed successfully!</h2>
-                <details>
-                    <summary style="cursor: pointer; font-weight: bold;">View Generated Conversation Topics</summary>
-                    <pre style="background-color: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 3px; white-space: pre-wrap;">{decoded_text}</pre>
-                </details>
-            </div>
-        """
 
-    return f"""
-    <html>
-        <head>
-            <title>Receipt Printer</title>
-        </head>
-        <body>
-            <h1>Generate Conversation Topics</h1>
-            {success_html}
-            <form action="/print" method="post" enctype="multipart/form-data">
-                <label for="file_input">Optional image to print with topics:</label><br>
-                <input type="file" name="file" id="file_input" accept="image/png, image/jpeg"><br><br>
-                
-                <label for="system_prompt_input">System prompt:</label><br>
-                <textarea name="system_prompt" id="system_prompt_input" style="width: 600px; height: 150px;">{BASE_PROMPT}</textarea><br><br>
-                
-                <label for="prompt_input">Optional topic focus (e.g., "make them about travel"):</label><br>
-                <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance..." style="width: 400px;"><br><br>
-
-                <label for="raw_text_input">Raw text (if provided, ignores AI generation and system prompt):</label><br>
-                <textarea name="raw_text" id="raw_text_input" placeholder="Enter text to print directly..." style="width: 600px; height: 100px;"></textarea><br><br>
-
-                <button type="submit">Print with AI Conversation Topics</button>
-            </form>
-        </body>
-    </html>
-    """
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "base_prompt": BASE_PROMPT,
+            "success": success,
+            "conversation_text": decoded_text,
+        },
+    )
 
 
 @app.post("/print", response_class=PlainTextResponse)
@@ -287,19 +267,8 @@ Printed on: {today}
 
 
 @app.get("/banner", response_class=HTMLResponse)
-def banner_form():
-    return """
-    <html>
-        <head><title>Banner Generator</title></head>
-        <body>
-            <h1>Banner Text Generator</h1>
-            <form action=\"/banner/preview\" method=\"post\">
-                <input type=\"text\" name=\"text\" placeholder=\"Enter banner text\" required>
-                <button type=\"submit\">Preview Banner</button>
-            </form>
-        </body>
-    </html>
-    """
+def banner_form(request: Request):
+    return templates.TemplateResponse("banner_form.html", {"request": request})
 
 
 # In-memory store for banner images by token
@@ -371,38 +340,8 @@ async def banner_preview(request: Request):
     token = str(uuid.uuid4())
     banner_images[token] = buf.getvalue()
     # Render HTML with image and print button
-    return HTMLResponse(
-        f"""
-    <html>
-        <head><title>Banner Preview</title></head>
-        <body>
-            <h1>Banner Preview</h1>
-            <img src="/banner/image?token={token}" style="border:1px solid #ccc; max-width:100%;"><br><br>
-            <form id="printForm" action="/print" method="post" enctype="multipart/form-data">
-                <input type="hidden" name="token" value="{token}">
-                <input type="hidden" name="filename" value="banner.png">
-                <button type="button" onclick="submitPrint()">Print</button>
-            </form>
-            <script>
-            function submitPrint() {{
-                fetch('/banner/image?token={token}')
-                  .then(resp => resp.blob())
-                  .then(blob => {{
-                    const form = document.getElementById('printForm');
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.name = 'file';
-                    const dt = new DataTransfer();
-                    dt.items.add(new File([blob], 'banner.png', {{type: 'image/png'}}));
-                    fileInput.files = dt.files;
-                    form.appendChild(fileInput);
-                    form.submit();
-                  }});
-            }}
-            </script>
-        </body>
-    </html>
-    """
+    return templates.TemplateResponse(
+        "banner_preview.html", {"request": request, "token": token}
     )
 
 

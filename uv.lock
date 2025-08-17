@@ -51,11 +51,15 @@ importlib-resources==6.5.2
     # via python-escpos
 iniconfig==2.1.0
     # via pytest
+jinja2==3.1.6
+    # via -r requirements.in
 jiter==0.10.0
     # via openai
+markupsafe==3.0.2
+    # via jinja2
 mypy-extensions==1.1.0
     # via black
-openai==1.99.3
+openai==1.99.9
     # via -r requirements.in
 packaging==25.0
     # via
@@ -97,7 +101,7 @@ pyyaml==6.0.2
     # via python-escpos
 qrcode==8.2
     # via python-escpos
-ruff==0.12.8
+ruff==0.12.9
     # via -r requirements.in
 setuptools==80.9.0
     # via python-escpos
