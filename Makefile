@@ -34,3 +34,7 @@ format:
 
 lint:
 	. $(VENV_DIR)/bin/activate && ruff check . --fix
+
+deploy:
+	ssh-add
+	ssh tisher.local "cd /srv/receipt-printer && git pull origin HEAD && make install"
