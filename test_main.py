@@ -1,9 +1,17 @@
 from fastapi.testclient import TestClient
-from main import app, get_printer_instance, get_usb_printer, get_printer
+from main import (
+    app,
+    get_printer_instance,
+    get_usb_printer,
+    get_printer,
+    prepare_thermal_image,
+    print_image_and_text,
+)
 from escpos.printer import Dummy
 from io import BytesIO
 import urllib.parse
 from unittest.mock import patch, MagicMock
+from PIL import Image
 
 client = TestClient(app)
 
@@ -173,3 +181,99 @@ def test_get_printer_real_mode(mock_get_usb_printer):
 
     assert result == mock_printer
     mock_get_usb_printer.assert_called_once()
+
+
+# Image Processing Tests
+def test_prepare_thermal_image_portrait():
+    """Test image processing with portrait orientation image"""
+    # Create a portrait image (height > width)
+    test_image = Image.new("RGB", (100, 200), color="white")
+
+    result = prepare_thermal_image(test_image, width=576)
+
+    assert result.mode == "1"  # Should be converted to 1-bit
+    assert result.width == 576  # Should be resized to target width
+    assert result.height == 1152  # Should maintain aspect ratio
+
+
+def test_prepare_thermal_image_landscape():
+    """Test image processing with landscape orientation image"""
+    # Create a landscape image (width > height)
+    test_image = Image.new("RGB", (200, 100), color="white")
+
+    result = prepare_thermal_image(test_image, width=576)
+
+    assert result.mode == "1"  # Should be converted to 1-bit
+    assert result.width == 576  # Should be resized to target width
+    assert result.height == 288  # Should maintain aspect ratio
+
+
+def test_prepare_thermal_image_grayscale():
+    """Test image processing converts to grayscale"""
+    # Create a color image
+    test_image = Image.new("RGB", (100, 100), color=(255, 128, 64))
+
+    result = prepare_thermal_image(test_image, width=576)
+
+    assert result.mode == "1"  # Should be converted to 1-bit
+    # Should be processed through grayscale conversion
+
+
+def test_prepare_thermal_image_custom_width():
+    """Test image processing with custom width"""
+    test_image = Image.new("RGB", (100, 100), color="white")
+
+    result = prepare_thermal_image(test_image, width=384)
+
+    assert result.width == 384  # Should use custom width
+    assert result.height == 384  # Should maintain aspect ratio
+
+
+def test_print_image_and_text_with_image():
+    """Test printing with both image and text"""
+    mock_printer = MagicMock()
+    test_image = Image.new("1", (100, 100), color=1)
+    test_text = "Test receipt text"
+
+    print_image_and_text(mock_printer, test_image, test_text)
+
+    # Should call printer methods multiple times
+    assert mock_printer.text.call_count >= 10
+    assert mock_printer.image.call_count >= 10
+    assert mock_printer.cut.call_count >= 10
+
+
+def test_print_image_and_text_text_only():
+    """Test printing with text only (no image)"""
+    mock_printer = MagicMock()
+    test_text = "Test receipt text only"
+
+    print_image_and_text(mock_printer, None, test_text)
+
+    # Should call printer methods multiple times
+    assert mock_printer.text.call_count >= 10
+    assert mock_printer.image.call_count == 0  # No image calls
+    assert mock_printer.cut.call_count >= 10
+
+
+def test_print_image_and_text_printer_cleanup():
+    """Test that printer connection is properly closed"""
+    mock_printer = MagicMock()
+    mock_printer.close = MagicMock()
+    test_text = "Test receipt text"
+
+    print_image_and_text(mock_printer, None, test_text)
+
+    # Should call close method if available
+    mock_printer.close.assert_called_once()
+
+
+def test_print_image_and_text_no_close_method():
+    """Test printing with printer that has no close method"""
+    mock_printer = MagicMock()
+    # Remove close method to simulate printer without close
+    del mock_printer.close
+    test_text = "Test receipt text"
+
+    # Should not raise an error
+    print_image_and_text(mock_printer, None, test_text)
