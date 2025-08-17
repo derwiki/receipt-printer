@@ -134,12 +134,39 @@ def print_image_and_text(printer, image: Optional[Image.Image], text: str):
         image: Prepared thermal image (1-bit PIL Image) or None
         text: Text content to print after the image
     """
+    text = """Generate 15 fun, indie-skewing conversation topics suitable for distributing at a small basement concert. All topics should be music-related, lighthearted but engaging, and designed to spark longer conversations without being too heavy. Prioritize questions that invite personal stories, opinions, and shared experiences around concerts, bands, albums, and live music culture. Keep phrasing short, plain, and conversational, as if they were prompts on a handout or zine page.
+
+
+Keep them low-effort to engage with,
+high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing.
+
+IMPORTANT: Do not use any emojis, unicode symbols, or special
+characters - only plain ASCII text.
+
+Follow this format but not content:
+1. What's a small choice we made that quietly shaped our life in a big way?
+2. What's something we've adapted to that used to feel like a dealbreaker?
+3. What's a way we've helped each other become more ourselves?
+4. What's something about you that's hard to explain but you know I get?
+5. What's one way we've protected each other's energy lately?
+6. What's a tension we've figured out how to live with instead of fix?
+7. What's something we've made easier for each other — even if it's still hard?
+8. What's one thing I do that reminds you we're on the same team?
+9. What's something we're learning together, even if we're learning it slowly?
+10. What's something that's still hard to say out loud, but getting easier?
+11. What's a moment when you realized we'd changed — in a good way?
+12. What's something you're holding onto right now that you don't want to rush past?
+13. What's a shared memory that still teaches you something?
+14. What's one truth we've earned the right to hold, just by going through life together?
+15. What's a part of our story we might underestimate, but will probably mean a lot in hindsight?
+"""
     try:
-        printer.text("\n")
-        if image is not None:
-            printer.image(image)
-        printer.text(text)
-        printer.cut()
+        for _ in range(10):
+            printer.text("\n")
+            if image is not None:
+                printer.image(image)
+            printer.text(text)
+            printer.cut()
     finally:
         # Always close the printer connection to prevent "Resource busy" errors
         if hasattr(printer, "close"):
