@@ -18,12 +18,11 @@
 <form action="/print" method="post" enctype="multipart/form-data">
     <div class="form-group">
         <label for="file_input">Optional image to print with topics:</label>
-        <input type="file" name="file" id="file_input" accept="image/png, image/jpeg">
-    </div>
-    
-    <div class="form-group">
-        <label for="system_prompt_input">System prompt:</label>
-        <textarea name="system_prompt" id="system_prompt_input" style="height: 150px;">{{ base_prompt }}</textarea>
+        <input type="file" name="file" id="file_input" accept="image/png, image/jpeg" onchange="previewImage(this)">
+        <div id="image_preview" class="image-preview" style="display: none;">
+            <img id="preview_img" src="" alt="Image preview" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 10px;">
+            <button type="button" onclick="removeImage()" class="remove-image-btn">Remove Image</button>
+        </div>
     </div>
     
     <div class="form-group">
@@ -31,11 +30,62 @@
         <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance...">
     </div>
 
-    <div class="form-group">
-        <label for="raw_text_input">Raw text (if provided, ignores AI generation and system prompt):</label>
-        <textarea name="raw_text" id="raw_text_input" placeholder="Enter text to print directly..." style="height: 100px;"></textarea>
-    </div>
+    <details class="form-group">
+        <summary style="cursor: pointer; font-weight: bold;">🤖 System Prompt</summary>
+        <div style="margin-top: 15px;">
+            <div class="form-group">
+                <label for="system_prompt_input">System prompt:</label>
+                <textarea name="system_prompt" id="system_prompt_input" style="height: 150px;">{{ base_prompt }}</textarea>
+            </div>
+        </div>
+    </details>
 
-    <button type="submit">Print with AI Conversation Topics</button>
+    <details class="form-group">
+        <summary style="cursor: pointer; font-weight: bold;">📝 Raw Text</summary>
+        <div style="margin-top: 15px;">
+            <div class="form-group">
+                <label for="raw_text_input">Raw text (if provided, ignores AI generation and system prompt):</label>
+                <textarea name="raw_text" id="raw_text_input" placeholder="Enter text to print directly..." style="height: 100px;"></textarea>
+            </div>
+        </div>
+    </details>
+
+    <button type="submit">Print it!</button>
 </form>
+
+<script>
+function previewImage(input) {
+    const preview = document.getElementById('image_preview');
+    const previewImg = document.getElementById('preview_img');
+    const fileInput = input;
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Check if it's an image file
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file (PNG or JPEG)');
+            fileInput.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+function removeImage() {
+    const fileInput = document.getElementById('file_input');
+    const preview = document.getElementById('image_preview');
+    
+    fileInput.value = '';
+    preview.style.display = 'none';
+}
+</script>
 {% endblock %} 

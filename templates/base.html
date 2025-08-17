@@ -1,55 +1,272 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Receipt Printer{% endblock %}</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 40px; 
-            line-height: 1.6;
+        * {
+            box-sizing: border-box;
         }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; 
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
         .success { 
             background-color: #d4edda; 
             border: 1px solid #c3e6cb; 
             color: #155724; 
-            padding: 15px; 
-            margin-bottom: 20px; 
-            border-radius: 5px; 
+            padding: 20px; 
+            margin-bottom: 25px; 
+            border-radius: 8px; 
         }
+        
         .form-group { 
-            margin-bottom: 15px; 
+            margin-bottom: 20px; 
         }
+        
         label { 
             display: block; 
-            margin-bottom: 5px; 
-            font-weight: bold; 
+            margin-bottom: 8px; 
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
         }
+        
         input, textarea { 
             width: 100%; 
-            padding: 8px; 
-            border: 1px solid #ddd; 
-            border-radius: 4px; 
-            box-sizing: border-box;
+            padding: 12px 16px; 
+            border: 2px solid #e9ecef; 
+            border-radius: 8px; 
+            font-size: 16px;
+            transition: border-color 0.2s ease;
+            background-color: white;
         }
+        
+        input:focus, textarea:focus { 
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+        
+        input[type="file"] {
+            padding: 12px;
+            border: 2px dashed #dee2e6;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        input[type="file"]:hover {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        
+        input[type="file"]::-webkit-file-upload-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-right: 12px;
+        }
+        
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background: #0056b3;
+        }
+        
         button { 
             background-color: #007bff; 
             color: white; 
-            padding: 10px 20px; 
+            padding: 14px 24px; 
             border: none; 
-            border-radius: 4px; 
+            border-radius: 8px; 
             cursor: pointer; 
             font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-top: 10px;
         }
+        
         button:hover { 
             background-color: #0056b3; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
         }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
         h1 {
-            color: #333;
+            color: #212529;
             margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        
+        h2 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        /* Mobile-first responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+            
+            .container {
+                padding: 20px;
+                border-radius: 8px;
+            }
+            
+            h1 {
+                font-size: 24px;
+                margin-bottom: 25px;
+            }
+            
+            input, textarea, button {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+            
+            .form-group {
+                margin-bottom: 18px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 22px;
+                margin-bottom: 20px;
+            }
+        }
+        
+        /* File input styling for better mobile experience */
+        input[type="file"] {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Remove the duplicate "Choose File" pseudo-element styling */
+        /* input[type="file"]::before {
+            content: "Choose File";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        input[type="file"]:hover::before {
+            background: #0056b3;
+        } */
+        
+        /* Success message improvements */
+        .success h2 {
+            margin-top: 0;
+            color: #155724;
+        }
+        
+        .success details {
+            margin-top: 15px;
+        }
+        
+        .success summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #155724;
+            padding: 8px 0;
+        }
+        
+        .success pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            border: 1px solid #e9ecef;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        
+        /* Image preview styling */
+        .image-preview {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .image-preview img {
+            display: block;
+            margin: 0 auto 15px auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .remove-image-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            width: auto;
+            margin-top: 0;
+        }
+        
+        .remove-image-btn:hover {
+            background-color: #c82333;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        }
+        
+        .remove-image-btn:active {
+            transform: translateY(0);
         }
     </style>
 </head>
