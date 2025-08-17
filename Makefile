@@ -1,7 +1,7 @@
 VENV_DIR := .venv
 LOCKFILE := uv.lock
 REQUIREMENTS := requirements.in
-UVICORN_CMD := uvicorn main:app --host 0.0.0.0 --port 8000
+UVICORN_CMD := uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 install:
 	uv venv $(VENV_DIR)
