@@ -279,10 +279,18 @@ banner_images = {}
 async def banner_preview(request: Request):
     form = await request.form()
     text = form.get("text", "")
-    width = 2048  # Arbitrary wide width for banner
-    height = 576
+    
+    # Use smaller dimensions for preview (much faster)
+    preview_width = 1024  # Reduced from 2048 for preview
+    preview_height = 288  # Reduced from 576 for preview
+    
+    # Full dimensions for actual printing
+    print_width = 2048
+    print_height = 576
+    
     bg = "white"
     fg = "black"
+    
     # Find a scalable TTF font
     font_path = None
     possible_fonts = [
@@ -295,50 +303,76 @@ async def banner_preview(request: Request):
         "/Users/adam/Library/Fonts/FreeSans.ttf",
         "/Users/adam/Library/Fonts/FreeSerif.ttf",
     ]
+    
     for path in possible_fonts:
         if os.path.exists(path):
             font_path = path
             break
+    
     if font_path is None:
         return PlainTextResponse(
             "No TTF font found on system. Please install Arial or DejaVuSans.",
             status_code=500,
         )
-    # Binary search for largest font size that fits height
+    
+    # Binary search for largest font size that fits preview height
     min_size = 10
-    max_size = height
+    max_size = preview_height
     best_size = min_size
+    
+    # Cache font objects to avoid repeated loading
+    font_cache = {}
+    
     while min_size <= max_size:
         mid = (min_size + max_size) // 2
-        font = ImageFont.truetype(font_path, mid)
+        
+        if mid not in font_cache:
+            font_cache[mid] = ImageFont.truetype(font_path, mid)
+        
+        font = font_cache[mid]
         dummy_img = Image.new("L", (10, 10))
         dummy_draw = ImageDraw.Draw(dummy_img)
         bbox = dummy_draw.textbbox((0, 0), text, font=font)
         text_height = bbox[3] - bbox[1]
-        if text_height <= height * 0.95:
+        
+        if text_height <= preview_height * 0.95:
             best_size = mid
             min_size = mid + 1
         else:
             max_size = mid - 1
-    font = ImageFont.truetype(font_path, best_size)
+    
+    # Create preview image with smaller dimensions
+    font = font_cache[best_size]
     dummy_img = Image.new("L", (10, 10))
     dummy_draw = ImageDraw.Draw(dummy_img)
     bbox = dummy_draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    temp_img = Image.new("RGBA", (text_width, text_height), (0, 0, 0, 0))
+    
+    # Scale text dimensions for preview
+    scale_factor = preview_height / print_height
+    preview_text_width = int(text_width * scale_factor)
+    preview_text_height = int(text_height * scale_factor)
+    
+    temp_img = Image.new("RGBA", (preview_text_width, preview_text_height), (0, 0, 0, 0))
     temp_draw = ImageDraw.Draw(temp_img)
-    temp_draw.text((-bbox[0], -bbox[1]), text, font=font, fill=fg)
-    image = Image.new("RGB", (max(text_width, width), height), bg)
-    x = (image.width - text_width) // 2
-    y = (height - text_height) // 2
-    image.paste(temp_img, (x, y), mask=temp_img.split()[-1])
+    temp_draw.text((-bbox[0] * scale_factor, -bbox[1] * scale_factor), text, font=font, fill=fg)
+    
+    # Create preview image
+    preview_image = Image.new("RGB", (max(preview_text_width, preview_width), preview_height), bg)
+    x = (preview_image.width - preview_text_width) // 2
+    y = (preview_height - preview_text_height) // 2
+    preview_image.paste(temp_img, (x, y), mask=temp_img.split()[-1])
+    
+    # Save as JPEG for much faster encoding (PNG was taking ~0.8s)
     buf = BytesIO()
-    image.save(buf, format="PNG")
+    preview_image.save(buf, format="JPEG", quality=95, optimize=True)
     buf.seek(0)
+    
     # Store image in memory with a token
     token = str(uuid.uuid4())
     banner_images[token] = buf.getvalue()
+    
     # Render HTML with image and print button
     return templates.TemplateResponse(
         "banner_preview.html", {"request": request, "token": token}
@@ -350,4 +384,4 @@ def banner_image(token: str):
     img_bytes = banner_images.get(token)
     if not img_bytes:
         return PlainTextResponse("Image not found", status_code=404)
-    return StreamingResponse(BytesIO(img_bytes), media_type="image/png")
+    return StreamingResponse(BytesIO(img_bytes), media_type="image/jpeg")
