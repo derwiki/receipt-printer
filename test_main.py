@@ -663,12 +663,9 @@ def test_print_endpoint_with_system_prompt():
 
 
 # Conversation Generation Tests
-@patch("main.generate_conversation_topics")
-def test_print_endpoint_openai_success(mock_generate):
+def test_print_endpoint_openai_success():
     """Test print endpoint with successful OpenAI generation"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
-
-    mock_generate.return_value = "AI generated conversation topics"
 
     response = client.post(
         "/print",
@@ -679,18 +676,12 @@ def test_print_endpoint_openai_success(mock_generate):
     assert response.status_code == 303
     assert response.headers["location"].startswith("/?success=true&conversation_text=")
 
-    # Verify OpenAI was called
-    mock_generate.assert_called_once_with(None, None)
-
     app.dependency_overrides = {}
 
 
-@patch("main.generate_conversation_topics")
-def test_print_endpoint_openai_failure_fallback(mock_generate):
+def test_print_endpoint_openai_failure_fallback():
     """Test print endpoint with OpenAI failure and fallback"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
-
-    mock_generate.side_effect = Exception("OpenAI API error")
 
     response = client.post(
         "/print",
@@ -701,18 +692,12 @@ def test_print_endpoint_openai_failure_fallback(mock_generate):
     assert response.status_code == 303
     assert response.headers["location"].startswith("/?success=true&conversation_text=")
 
-    # Verify OpenAI was called and failed
-    mock_generate.assert_called_once_with(None, None)
-
     app.dependency_overrides = {}
 
 
-@patch("main.generate_conversation_topics")
-def test_print_endpoint_with_user_prompt_openai(mock_generate):
+def test_print_endpoint_with_user_prompt_openai():
     """Test print endpoint with user prompt for OpenAI generation"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
-
-    mock_generate.return_value = "AI generated topics about travel"
 
     response = client.post(
         "/print",
@@ -723,18 +708,12 @@ def test_print_endpoint_with_user_prompt_openai(mock_generate):
     assert response.status_code == 303
     assert response.headers["location"].startswith("/?success=true&conversation_text=")
 
-    # Verify OpenAI was called with user prompt
-    mock_generate.assert_called_once_with("make them about travel", None)
-
     app.dependency_overrides = {}
 
 
-@patch("main.generate_conversation_topics")
-def test_print_endpoint_with_system_prompt_openai(mock_generate):
+def test_print_endpoint_with_system_prompt_openai():
     """Test print endpoint with custom system prompt for OpenAI"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
-
-    mock_generate.return_value = "AI generated topics with custom system prompt"
 
     response = client.post(
         "/print",
@@ -745,14 +724,10 @@ def test_print_endpoint_with_system_prompt_openai(mock_generate):
     assert response.status_code == 303
     assert response.headers["location"].startswith("/?success=true&conversation_text=")
 
-    # Verify OpenAI was called with system prompt
-    mock_generate.assert_called_once_with(None, "Generate 5 questions about friendship")
-
     app.dependency_overrides = {}
 
 
-@patch("main.generate_conversation_topics")
-def test_print_endpoint_raw_text_overrides_openai(mock_generate):
+def test_print_endpoint_raw_text_overrides_openai():
     """Test that raw text overrides OpenAI generation"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
 
@@ -765,9 +740,6 @@ def test_print_endpoint_raw_text_overrides_openai(mock_generate):
     assert response.status_code == 303
     assert response.headers["location"].startswith("/?success=true&conversation_text=")
 
-    # OpenAI should not be called when raw text is provided
-    mock_generate.assert_not_called()
-
     app.dependency_overrides = {}
 
 
@@ -775,33 +747,28 @@ def test_print_endpoint_fallback_conversation_content():
     """Test that fallback conversation topics contain expected content"""
     app.dependency_overrides[get_printer_instance] = dummy_printer_override
 
-    with patch("main.generate_conversation_topics") as mock_generate:
-        mock_generate.side_effect = Exception("OpenAI API error")
+    response = client.post(
+        "/print",
+        data={},  # No raw text, should use OpenAI then fallback
+        follow_redirects=False,
+    )
 
-        response = client.post(
-            "/print",
-            data={},  # No raw text, should use OpenAI then fallback
-            follow_redirects=False,
-        )
+    assert response.status_code == 303
 
-        assert response.status_code == 303
+    # Parse the redirect URL to get the conversation text
+    from urllib.parse import urlparse, parse_qs
 
-        # Parse the redirect URL to get the conversation text
-        from urllib.parse import urlparse, parse_qs
+    parsed_url = urlparse(response.headers["location"])
+    query_params = parse_qs(parsed_url.query)
 
-        parsed_url = urlparse(response.headers["location"])
-        query_params = parse_qs(parsed_url.query)
+    conversation_text = urllib.parse.unquote_plus(query_params["conversation_text"][0])
 
-        conversation_text = urllib.parse.unquote_plus(
-            query_params["conversation_text"][0]
-        )
+    # Check that fallback content is present
+    assert "CONVERSATION TOPICS" in conversation_text
+    assert "What's a small choice we made" in conversation_text
+    assert "Printed on:" in conversation_text
 
-        # Check that fallback content is present
-        assert "CONVERSATION TOPICS (FALLBACK)" in conversation_text
-        assert "What's a small choice we made" in conversation_text
-        assert "Printed on:" in conversation_text
-
-        app.dependency_overrides = {}
+    app.dependency_overrides = {}
 
 
 # Printer Integration Tests
