@@ -802,3 +802,178 @@ def test_print_endpoint_fallback_conversation_content():
         assert "Printed on:" in conversation_text
 
         app.dependency_overrides = {}
+
+
+# Printer Integration Tests
+def test_print_endpoint_dummy_printer_output_file():
+    """Test that dummy printer generates output.escpos file"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Clean up any existing output file
+    import os
+
+    if os.path.exists("output.escpos"):
+        os.remove("output.escpos")
+
+    response = client.post(
+        "/print",
+        data={"raw_text": "Test receipt for dummy printer"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+    # Check that output file was created
+    assert os.path.exists("output.escpos")
+    assert os.path.getsize("output.escpos") > 0
+
+    # Clean up
+    os.remove("output.escpos")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_dummy_printer_with_image():
+    """Test dummy printer with image upload"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Clean up any existing output file
+    import os
+
+    if os.path.exists("output.escpos"):
+        os.remove("output.escpos")
+
+    # Create test image
+    test_image = BytesIO()
+    from PIL import Image
+
+    Image.new("RGB", (100, 100), color="purple").save(test_image, format="JPEG")
+    test_image.seek(0)
+
+    response = client.post(
+        "/print",
+        files={"file": ("test.jpg", test_image, "image/jpeg")},
+        data={"raw_text": "Test receipt with image"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+    # Check that output file was created
+    assert os.path.exists("output.escpos")
+    assert os.path.getsize("output.escpos") > 0
+
+    # Clean up
+    os.remove("output.escpos")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_real_printer_no_output_file():
+    """Test that real printer doesn't generate output.escpos file"""
+
+    class MockRealPrinter:
+        def image(self, img):
+            pass
+
+        def text(self, txt):
+            pass
+
+        def cut(self):
+            pass
+
+        def close(self):
+            pass
+
+    def mock_real_printer():
+        return MockRealPrinter()
+
+    app.dependency_overrides[get_printer_instance] = mock_real_printer
+
+    # Clean up any existing output file
+    import os
+
+    if os.path.exists("output.escpos"):
+        os.remove("output.escpos")
+
+    response = client.post(
+        "/print",
+        data={"raw_text": "Test receipt for real printer"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+    # Check that output file was NOT created
+    assert not os.path.exists("output.escpos")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_printer_resource_cleanup():
+    """Test that printer resources are properly cleaned up"""
+
+    class MockPrinterWithClose:
+        def __init__(self):
+            self.closed = False
+
+        def image(self, img):
+            pass
+
+        def text(self, txt):
+            pass
+
+        def cut(self):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    mock_printer = MockPrinterWithClose()
+
+    def mock_printer_factory():
+        return mock_printer
+
+    app.dependency_overrides[get_printer_instance] = mock_printer_factory
+
+    response = client.post(
+        "/print",
+        data={"raw_text": "Test receipt for resource cleanup"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+    # Check that close method was called
+    assert mock_printer.closed
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_printer_no_close_method():
+    """Test printing with printer that has no close method"""
+
+    class MockPrinterNoClose:
+        def image(self, img):
+            pass
+
+        def text(self, txt):
+            pass
+
+        def cut(self):
+            pass
+
+    def mock_printer_factory():
+        return MockPrinterNoClose()
+
+    app.dependency_overrides[get_printer_instance] = mock_printer_factory
+
+    response = client.post(
+        "/print",
+        data={"raw_text": "Test receipt for printer without close method"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+    app.dependency_overrides = {}
