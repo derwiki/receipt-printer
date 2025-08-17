@@ -6,12 +6,14 @@ from main import (
     get_printer,
     prepare_thermal_image,
     print_image_and_text,
+    handle_printer_exceptions,
 )
 from escpos.printer import Dummy
 from io import BytesIO
 import urllib.parse
 from unittest.mock import patch, MagicMock
 from PIL import Image
+from fastapi.responses import PlainTextResponse
 
 client = TestClient(app)
 
@@ -277,3 +279,102 @@ def test_print_image_and_text_no_close_method():
 
     # Should not raise an error
     print_image_and_text(mock_printer, None, test_text)
+
+
+# Error Handling Tests
+def test_handle_printer_exceptions_success():
+    """Test that successful function calls pass through unchanged"""
+
+    @handle_printer_exceptions
+    async def test_func():
+        return "success"
+
+    # Test the wrapper function directly
+    import asyncio
+
+    result = asyncio.run(test_func())
+    assert result == "success"
+
+
+def test_handle_printer_exceptions_exception():
+    """Test that exceptions are caught and return error response"""
+
+    @handle_printer_exceptions
+    async def test_func():
+        raise Exception("Test error")
+
+    import asyncio
+
+    result = asyncio.run(test_func())
+
+    assert isinstance(result, PlainTextResponse)
+    assert result.status_code == 500
+    assert "Test error" in result.body.decode()
+
+
+def test_handle_printer_exceptions_printer_error():
+    """Test that printer errors return proper error response"""
+
+    @handle_printer_exceptions
+    async def test_func():
+        raise Exception("Printer connection failed")
+
+    import asyncio
+
+    result = asyncio.run(test_func())
+
+    assert isinstance(result, PlainTextResponse)
+    assert result.status_code == 500
+    assert "Printer connection failed" in result.body.decode()
+
+
+def test_print_endpoint_unsupported_file_type():
+    """Test print endpoint with unsupported file type"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Create a text file instead of image
+    test_file = BytesIO(b"This is not an image file")
+    test_file.seek(0)
+
+    response = client.post(
+        "/print",
+        files={"file": ("test.txt", test_file, "text/plain")},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert response.text == "Unsupported file type"
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_no_file():
+    """Test print endpoint with no file uploaded"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    response = client.post(
+        "/print",
+        data={},  # No file
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    # Should still work and generate conversation topics
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_raw_text():
+    """Test print endpoint with raw text input"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    response = client.post(
+        "/print",
+        data={"raw_text": "Custom receipt text"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    # Should redirect with success and custom text
+
+    app.dependency_overrides = {}
