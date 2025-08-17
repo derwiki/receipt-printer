@@ -134,32 +134,6 @@ def print_image_and_text(printer, image: Optional[Image.Image], text: str):
         image: Prepared thermal image (1-bit PIL Image) or None
         text: Text content to print after the image
     """
-    text = """Generate 15 fun, indie-skewing conversation topics suitable for distributing at a small basement concert. All topics should be music-related, lighthearted but engaging, and designed to spark longer conversations without being too heavy. Prioritize questions that invite personal stories, opinions, and shared experiences around concerts, bands, albums, and live music culture. Keep phrasing short, plain, and conversational, as if they were prompts on a handout or zine page.
-
-
-Keep them low-effort to engage with,
-high-signal in payoff, and phrased in plain ASCII-safe language suitable for thermal printing.
-
-IMPORTANT: Do not use any emojis, unicode symbols, or special
-characters - only plain ASCII text.
-
-Follow this format but not content:
-1. What's a small choice we made that quietly shaped our life in a big way?
-2. What's something we've adapted to that used to feel like a dealbreaker?
-3. What's a way we've helped each other become more ourselves?
-4. What's something about you that's hard to explain but you know I get?
-5. What's one way we've protected each other's energy lately?
-6. What's a tension we've figured out how to live with instead of fix?
-7. What's something we've made easier for each other — even if it's still hard?
-8. What's one thing I do that reminds you we're on the same team?
-9. What's something we're learning together, even if we're learning it slowly?
-10. What's something that's still hard to say out loud, but getting easier?
-11. What's a moment when you realized we'd changed — in a good way?
-12. What's something you're holding onto right now that you don't want to rush past?
-13. What's a shared memory that still teaches you something?
-14. What's one truth we've earned the right to hold, just by going through life together?
-15. What's a part of our story we might underestimate, but will probably mean a lot in hindsight?
-"""
     try:
         for _ in range(10):
             printer.text("\n")
@@ -220,6 +194,10 @@ def index(success: bool = Query(False), conversation_text: str = Query("")):
                 
                 <label for="prompt_input">Optional topic focus (e.g., "make them about travel"):</label><br>
                 <input type="text" name="user_prompt" id="prompt_input" placeholder="Enter optional topic guidance..." style="width: 400px;"><br><br>
+
+                <label for="raw_text_input">Raw text (if provided, ignores AI generation and system prompt):</label><br>
+                <textarea name="raw_text" id="raw_text_input" placeholder="Enter text to print directly..." style="width: 600px; height: 100px;"></textarea><br><br>
+
                 <button type="submit">Print with AI Conversation Topics</button>
             </form>
         </body>
@@ -233,6 +211,7 @@ async def print_image(
     file: Optional[UploadFile] = File(None),
     user_prompt: Optional[str] = Form(None),
     system_prompt: Optional[str] = Form(None),
+    raw_text: Optional[str] = Form(None),
     printer=Depends(get_printer_instance),
 ):
     image = None
@@ -250,20 +229,25 @@ async def print_image(
             original = Image.open(tmp.name)
             image = prepare_thermal_image(original, width=576)
 
-    # Generate conversation topics using OpenAI
-    try:
-        logging.info("Generating conversation topics...")
-        conversation_text = generate_conversation_topics(user_prompt, system_prompt)
-    except Exception as e:
-        logging.error(f"Failed to generate topics, using fallback: {e}")
-        # Fallback to original static topics if OpenAI fails
-        from datetime import datetime
-        import pytz
+    # Use raw text if provided, otherwise generate conversation topics using OpenAI
+    if raw_text and raw_text.strip():
+        logging.info("Using provided raw text")
+        conversation_text = raw_text.strip()
+    else:
+        # Generate conversation topics using OpenAI
+        try:
+            logging.info("Generating conversation topics...")
+            conversation_text = generate_conversation_topics(user_prompt, system_prompt)
+        except Exception as e:
+            logging.error(f"Failed to generate topics, using fallback: {e}")
+            # Fallback to original static topics if OpenAI fails
+            from datetime import datetime
+            import pytz
 
-        pdt = pytz.timezone("America/Los_Angeles")
-        today = datetime.now(pdt).strftime("%B %d, %Y")
+            pdt = pytz.timezone("America/Los_Angeles")
+            today = datetime.now(pdt).strftime("%B %d, %Y")
 
-        conversation_text = f"""
+            conversation_text = f"""
 CONVERSATION TOPICS (FALLBACK)
 ========================================
 Printed on: {today}
@@ -285,7 +269,7 @@ Printed on: {today}
 15. What's a part of our story we might underestimate, but will probably mean a lot in hindsight?
 
 ========================================
-        """
+            """
 
     # Print image and generated text (image may be None)
     print_image_and_text(printer, image, conversation_text)
