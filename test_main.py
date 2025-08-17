@@ -530,3 +530,133 @@ def test_banner_preview_font_handling():
     # If fonts are available, should generate preview
     # If no fonts, should return 500 error
     # Either way, we're testing the font handling logic
+
+
+# File Upload Edge Cases Tests
+def test_print_endpoint_png_file():
+    """Test print endpoint with PNG file upload"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Create a PNG image
+    test_image = BytesIO()
+    from PIL import Image
+
+    Image.new("RGB", (100, 100), color="blue").save(test_image, format="PNG")
+    test_image.seek(0)
+
+    response = client.post(
+        "/print",
+        files={"file": ("test.png", test_image, "image/png")},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_large_image():
+    """Test print endpoint with large image file"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Create a larger image
+    test_image = BytesIO()
+    from PIL import Image
+
+    Image.new("RGB", (800, 600), color="red").save(test_image, format="JPEG")
+    test_image.seek(0)
+
+    response = client.post(
+        "/print",
+        files={"file": ("large.jpg", test_image, "image/jpeg")},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_missing_filename():
+    """Test print endpoint with file that has no filename"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Create a file without filename
+    test_file = BytesIO(b"fake image data")
+    test_file.seek(0)
+
+    response = client.post(
+        "/print",
+        files={"file": ("", test_file, "image/jpeg")},
+        follow_redirects=False,
+    )
+
+    # FastAPI returns 422 for empty filenames
+    assert response.status_code == 422
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_multiple_files():
+    """Test print endpoint with multiple files (should use first one)"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    # Create two image files
+    test_image1 = BytesIO()
+    test_image2 = BytesIO()
+    from PIL import Image
+
+    Image.new("RGB", (100, 100), color="green").save(test_image1, format="JPEG")
+    Image.new("RGB", (200, 200), color="yellow").save(test_image2, format="JPEG")
+    test_image1.seek(0)
+    test_image2.seek(0)
+
+    response = client.post(
+        "/print",
+        files=[
+            ("file", ("first.jpg", test_image1, "image/jpeg")),
+            ("file", ("second.jpg", test_image2, "image/jpeg")),
+        ],
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_with_user_prompt():
+    """Test print endpoint with user prompt for topic generation"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    response = client.post(
+        "/print",
+        data={"user_prompt": "make them about cooking and food"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+
+    app.dependency_overrides = {}
+
+
+def test_print_endpoint_with_system_prompt():
+    """Test print endpoint with custom system prompt"""
+    app.dependency_overrides[get_printer_instance] = dummy_printer_override
+
+    custom_prompt = "Generate 10 questions about relationships"
+
+    response = client.post(
+        "/print",
+        data={"system_prompt": custom_prompt},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+
+    app.dependency_overrides = {}
