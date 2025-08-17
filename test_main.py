@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from main import app, get_printer_instance
 from escpos.printer import Dummy
 from io import BytesIO
+import urllib.parse
 
 client = TestClient(app)
 
@@ -27,7 +28,21 @@ def test_print_endpoint_with_dummy():
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/"
+    # Check that redirect URL starts with expected pattern and contains success parameters
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+    
+    # Parse the URL to extract and decode the conversation_text parameter
+    from urllib.parse import urlparse, parse_qs
+    parsed_url = urlparse(response.headers["location"])
+    query_params = parse_qs(parsed_url.query)
+    
+    assert "success" in query_params
+    assert "conversation_text" in query_params
+    assert query_params["success"][0] == "true"
+    
+    # Decode the conversation text and verify it contains expected content
+    conversation_text = urllib.parse.unquote_plus(query_params["conversation_text"][0])
+    assert "CONVERSATION TOPICS" in conversation_text
 
     app.dependency_overrides = {}  # Cleanup
 
@@ -61,6 +76,20 @@ def test_print_endpoint_with_real_printer_mock(monkeypatch):
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/"
+    # Check that redirect URL starts with expected pattern and contains success parameters
+    assert response.headers["location"].startswith("/?success=true&conversation_text=")
+    
+    # Parse the URL to extract and decode the conversation_text parameter
+    from urllib.parse import urlparse, parse_qs
+    parsed_url = urlparse(response.headers["location"])
+    query_params = parse_qs(parsed_url.query)
+    
+    assert "success" in query_params
+    assert "conversation_text" in query_params
+    assert query_params["success"][0] == "true"
+    
+    # Decode the conversation text and verify it contains expected content
+    conversation_text = urllib.parse.unquote_plus(query_params["conversation_text"][0])
+    assert "CONVERSATION TOPICS" in conversation_text
 
     app.dependency_overrides = {}
