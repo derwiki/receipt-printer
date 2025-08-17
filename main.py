@@ -1,14 +1,12 @@
 import os
 import tempfile
 import logging
+import urllib.parse
+import uuid
 from functools import wraps
+from io import BytesIO
+from typing import Optional
 
-# Configure logging to output to STDOUT
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],  # This outputs to STDOUT
-)
 from fastapi import FastAPI, UploadFile, File, Depends, Request, Form, Query
 from fastapi.responses import (
     PlainTextResponse,
@@ -16,13 +14,17 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
-import urllib.parse
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
 from escpos.printer import Dummy, Usb
-from io import BytesIO
-import uuid
-from typing import Optional
+
 from conversation_topics import generate_conversation_topics
+
+# Configure logging to output to STDOUT
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],  # This outputs to STDOUT
+)
 
 app = FastAPI()
 
