@@ -378,3 +378,55 @@ def test_print_endpoint_raw_text():
     # Should redirect with success and custom text
 
     app.dependency_overrides = {}
+
+
+# Index Endpoint Tests
+def test_index_endpoint_basic():
+    """Test basic index endpoint without parameters"""
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Generate Conversation Topics" in response.text
+    assert "Print it!" in response.text
+
+
+def test_index_endpoint_with_success():
+    """Test index endpoint with success parameter"""
+    response = client.get("/?success=true")
+
+    assert response.status_code == 200
+    assert "Generate Conversation Topics" in response.text
+    # Should not show success message without conversation_text
+
+
+def test_index_endpoint_with_conversation_text():
+    """Test index endpoint with conversation text parameter"""
+    test_text = "Test conversation topics"
+    encoded_text = urllib.parse.quote_plus(test_text)
+
+    response = client.get(f"/?success=true&conversation_text={encoded_text}")
+
+    assert response.status_code == 200
+    assert "Success! Topics printed successfully!" in response.text
+    assert test_text in response.text
+
+
+def test_index_endpoint_with_special_characters():
+    """Test index endpoint with special characters in conversation text"""
+    test_text = "Special chars: & < > quotes and percent %"
+    encoded_text = urllib.parse.quote_plus(test_text)
+
+    response = client.get(f"/?success=true&conversation_text={encoded_text}")
+
+    assert response.status_code == 200
+    # Check that the decoded text appears in the response
+    assert "Special chars:" in response.text
+    assert "quotes and percent" in response.text
+
+
+def test_index_endpoint_malformed_parameters():
+    """Test index endpoint with malformed query parameters"""
+    response = client.get("/?invalid_param=value")
+
+    assert response.status_code == 200
+    assert "Generate Conversation Topics" in response.text
