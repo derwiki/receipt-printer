@@ -3,6 +3,8 @@ httpx
 pillow
 pyserial
 pytest
+pytest-cov
+coverage
 python-escpos
 python-multipart
 uvicorn

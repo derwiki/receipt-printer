@@ -29,12 +29,11 @@ run-real:
 test:
 	. .venv/bin/activate && pytest test_main.py
 
+test_coverage:
+	. $(VENV_DIR)/bin/activate && pytest test_main.py --cov=main --cov-report=term-missing --cov-report=html
+
 format:
 	. $(VENV_DIR)/bin/activate && black .
 
 lint:
 	. $(VENV_DIR)/bin/activate && ruff check . --fix
-
-deploy:
-	ssh-add
-	ssh tisher.local "cd /srv/receipt-printer && git pull origin HEAD && make install"
