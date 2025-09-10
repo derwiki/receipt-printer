@@ -6,6 +6,8 @@ import uuid
 from functools import wraps
 from io import BytesIO
 from typing import Optional
+import re
+import unicodedata
 
 from fastapi import FastAPI, UploadFile, File, Depends, Request, Form, Query
 from fastapi.responses import (
@@ -141,16 +143,118 @@ def print_image_and_text(printer, image: Optional[Image.Image], text: str):
         text: Text content to print after the image
     """
     try:
-        for _ in range(10):
-            printer.text("\n")
-            if image is not None:
-                printer.image(image)
-            printer.text(text)
-            printer.cut()
+        printer.text("\n")
+        if image is not None:
+            printer.image(image)
+        # Sanitize text to printer-safe characters
+        printer.text(sanitize_for_receipt(text))
+        printer.cut()
     finally:
         # Always close the printer connection to prevent "Resource busy" errors
         if hasattr(printer, "close"):
             printer.close()
+
+
+def sanitize_for_receipt(text: str) -> str:
+    """
+    Convert/strip characters that commonly print garbled on ESC/POS printers.
+
+    - Normalizes fancy quotes/dashes/ellipsis to ASCII
+    - Removes zero-width and bidi control characters
+    - Replaces common symbols (degree, trademark, euro, etc.) with ASCII
+    - Decomposes accents and drops non-ASCII fallbacks
+    - Ensures only printable ASCII and newlines are emitted
+
+    Args:
+        text: Input text possibly containing Unicode punctuation/symbols
+
+    Returns:
+        Sanitized ASCII-only text suitable for receipt printers
+    """
+    if not text:
+        return ""
+
+    # Step 1: direct replacements for common typography and symbols
+    repl = {
+        # Quotes
+        ord("“"): '"', ord("”"): '"', ord("„"): '"', ord("‟"): '"', ord("❝"): '"', ord("❞"): '"',
+        ord("‘"): "'", ord("’"): "'", ord("‚"): "'", ord("‛"): "'", ord("❛"): "'", ord("❜"): "'",
+        ord("‹"): '"', ord("›"): '"', ord("«"): '"', ord("»"): '"',
+
+        # Dashes and hyphens
+        ord("—"): "--",  # em dash
+        ord("–"): "-",   # en dash
+        ord("‑"): "-",   # non-breaking hyphen
+        ord("−"): "-",   # minus sign
+
+        # Ellipsis
+        ord("…"): "...",
+
+        # Spaces
+        ord("\u00A0"): " ",  # NBSP
+        ord("\u202F"): " ",  # narrow NBSP
+        ord("\u2007"): " ",  # figure space
+        ord("\u2009"): " ",  # thin space
+        ord("\u2008"): " ",  # punctuation space
+        ord("\u2002"): " ",  # en space
+        ord("\u2003"): " ",  # em space
+        ord("\u2004"): " ",  # three-per-em space
+        ord("\u2005"): " ",  # four-per-em space
+        ord("\u2006"): " ",  # six-per-em space
+
+        # Symbols
+        ord("°"): " deg",
+        ord("•"): "*",
+        ord("·"): "*",
+        ord("™"): " (TM)",
+        ord("®"): " (R)",
+        ord("©"): " (C)",
+        ord("€"): " EUR",
+        ord("£"): " GBP",
+        ord("¥"): " YEN",
+        ord("¢"): " cent",
+
+        # Fractions
+        ord("½"): "1/2",
+        ord("¼"): "1/4",
+        ord("¾"): "3/4",
+        ord("⅓"): "1/3",
+        ord("⅔"): "2/3",
+        ord("⅛"): "1/8",
+        ord("⅜"): "3/8",
+        ord("⅝"): "5/8",
+        ord("⅞"): "7/8",
+
+        # Arrows/common pictographs -> ASCII
+        ord("→"): "->",
+        ord("←"): "<-",
+        ord("↑"): "^",
+        ord("↓"): "v",
+    }
+
+    text = text.translate(repl)
+
+    # Step 2: remove zero-width and bidi control characters that can confuse printers
+    zero_width_pattern = re.compile("[\u200B\u200C\u200D\u2060\uFEFF\u200E\u200F\u202A-\u202E]")
+    text = zero_width_pattern.sub("", text)
+
+    # Step 3: normalize accents and drop non-ASCII remnants
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+
+    # Step 4: normalize newlines and tabs
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.expandtabs(2)
+
+    # Step 5: restrict to printable ASCII + newlines
+    allowed = set(chr(c) for c in range(32, 127))
+    allowed.add("\n")
+    text = "".join(ch for ch in text if ch in allowed)
+
+    # Optional: collapse excessive whitespace around newlines
+    text = re.sub(r"[ \t]+\n", "\n", text)
+
+    return text
 
 
 def handle_printer_exceptions(endpoint_func):
