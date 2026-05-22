@@ -18,6 +18,7 @@ from fastapi.responses import (
 )
 from fastapi.templating import Jinja2Templates
 from PIL import Image, ImageOps, ImageEnhance, ImageDraw, ImageFont
+from pilmoji import Pilmoji
 from escpos.printer import Dummy, Usb
 
 from conversation_topics import generate_conversation_topics
@@ -281,9 +282,9 @@ def index(
         decoded_text = urllib.parse.unquote_plus(conversation_text)
 
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "base_prompt": BASE_PROMPT,
             "success": success,
             "conversation_text": decoded_text,
@@ -372,7 +373,7 @@ Printed on: {today}
 
 @app.get("/banner", response_class=HTMLResponse)
 def banner_form(request: Request):
-    return templates.TemplateResponse("banner_form.html", {"request": request})
+    return templates.TemplateResponse(request, "banner_form.html")
 
 
 # In-memory store for banner images by token
@@ -399,33 +400,31 @@ def find_font_path():
 
 
 def make_banner_image(text: str, height: int, font_path: str, bg="white", fg="black") -> Image.Image:
-    """Render text into a landscape banner image filling the given height."""
+    """Render text into a landscape banner image filling the given height, with emoji support."""
     font_cache = {}
     min_size, max_size = 10, height
     best_size = min_size
 
-    while min_size <= max_size:
-        mid = (min_size + max_size) // 2
-        if mid not in font_cache:
-            font_cache[mid] = ImageFont.truetype(font_path, mid)
-        font = font_cache[mid]
-        dummy = ImageDraw.Draw(Image.new("L", (10, 10)))
-        bbox = dummy.textbbox((0, 0), text, font=font)
-        if bbox[3] - bbox[1] <= height * 0.95:
-            best_size = mid
-            min_size = mid + 1
-        else:
-            max_size = mid - 1
+    measure_canvas = Image.new("RGB", (10, 10))
+    with Pilmoji(measure_canvas) as measurer:
+        while min_size <= max_size:
+            mid = (min_size + max_size) // 2
+            if mid not in font_cache:
+                font_cache[mid] = ImageFont.truetype(font_path, mid)
+            font = font_cache[mid]
+            _, text_h = measurer.getsize(text, font=font)
+            if text_h <= height * 0.95:
+                best_size = mid
+                min_size = mid + 1
+            else:
+                max_size = mid - 1
 
-    font = font_cache[best_size]
-    dummy = ImageDraw.Draw(Image.new("L", (10, 10)))
-    bbox = dummy.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
+        font = font_cache[best_size]
+        text_w, text_h = measurer.getsize(text, font=font)
 
     img = Image.new("RGB", (max(text_w, 1), height), bg)
-    draw = ImageDraw.Draw(img)
-    draw.text((-bbox[0], (height - text_h) // 2 - bbox[1]), text, font=font, fill=fg)
+    with Pilmoji(img) as pilmoji:
+        pilmoji.text((0, (height - text_h) // 2), text, fg, font)
     return img
 
 
@@ -451,7 +450,7 @@ async def banner_preview(request: Request):
     banner_images[token] = {"text": text, "font_path": font_path, "preview": buf.getvalue()}
 
     return templates.TemplateResponse(
-        "banner_preview.html", {"request": request, "token": token}
+        request, "banner_preview.html", {"token": token}
     )
 
 
