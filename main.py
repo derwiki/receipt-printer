@@ -384,14 +384,8 @@ async def banner_preview(request: Request):
     form = await request.form()
     text = form.get("text", "")
     
-    # Use smaller dimensions for preview (much faster)
-    preview_width = 1024  # Reduced from 2048 for preview
-    preview_height = 288  # Reduced from 576 for preview
-    
-    # Full dimensions for actual printing
-    print_width = 2048
-    print_height = 576
-    
+    preview_width = 1024
+    preview_height = 288
     bg = "white"
     fg = "black"
     
@@ -453,19 +447,14 @@ async def banner_preview(request: Request):
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     
-    # Scale text dimensions for preview
-    scale_factor = preview_height / print_height
-    preview_text_width = int(text_width * scale_factor)
-    preview_text_height = int(text_height * scale_factor)
-    
-    temp_img = Image.new("RGBA", (preview_text_width, preview_text_height), (0, 0, 0, 0))
+    temp_img = Image.new("RGBA", (text_width, text_height), (0, 0, 0, 0))
     temp_draw = ImageDraw.Draw(temp_img)
-    temp_draw.text((-bbox[0] * scale_factor, -bbox[1] * scale_factor), text, font=font, fill=fg)
-    
+    temp_draw.text((-bbox[0], -bbox[1]), text, font=font, fill=fg)
+
     # Create preview image
-    preview_image = Image.new("RGB", (max(preview_text_width, preview_width), preview_height), bg)
-    x = (preview_image.width - preview_text_width) // 2
-    y = (preview_height - preview_text_height) // 2
+    preview_image = Image.new("RGB", (max(text_width, preview_width), preview_height), bg)
+    x = (preview_image.width - text_width) // 2
+    y = (preview_height - text_height) // 2
     preview_image.paste(temp_img, (x, y), mask=temp_img.split()[-1])
     
     # Save as JPEG for much faster encoding (PNG was taking ~0.8s)
