@@ -379,94 +379,77 @@ def banner_form(request: Request):
 banner_images = {}
 
 
+POSSIBLE_FONTS = [
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Supplemental/Verdana.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/Users/adam/Library/Fonts/FreeSans.ttf",
+    "/Users/adam/Library/Fonts/FreeSerif.ttf",
+]
+
+
+def find_font_path():
+    for path in POSSIBLE_FONTS:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def make_banner_image(text: str, height: int, font_path: str, bg="white", fg="black") -> Image.Image:
+    """Render text into a landscape banner image filling the given height."""
+    font_cache = {}
+    min_size, max_size = 10, height
+    best_size = min_size
+
+    while min_size <= max_size:
+        mid = (min_size + max_size) // 2
+        if mid not in font_cache:
+            font_cache[mid] = ImageFont.truetype(font_path, mid)
+        font = font_cache[mid]
+        dummy = ImageDraw.Draw(Image.new("L", (10, 10)))
+        bbox = dummy.textbbox((0, 0), text, font=font)
+        if bbox[3] - bbox[1] <= height * 0.95:
+            best_size = mid
+            min_size = mid + 1
+        else:
+            max_size = mid - 1
+
+    font = font_cache[best_size]
+    dummy = ImageDraw.Draw(Image.new("L", (10, 10)))
+    bbox = dummy.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    img = Image.new("RGB", (max(text_w, 1), height), bg)
+    draw = ImageDraw.Draw(img)
+    draw.text((-bbox[0], (height - text_h) // 2 - bbox[1]), text, font=font, fill=fg)
+    return img
+
+
 @app.post("/banner/preview", response_class=HTMLResponse)
 async def banner_preview(request: Request):
     form = await request.form()
     text = form.get("text", "")
-    
-    preview_width = 1024
-    preview_height = 288
-    bg = "white"
-    fg = "black"
-    
-    # Find a scalable TTF font
-    font_path = None
-    possible_fonts = [
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Verdana.ttf",
-        "/Library/Fonts/Arial.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/Users/adam/Library/Fonts/FreeSans.ttf",
-        "/Users/adam/Library/Fonts/FreeSerif.ttf",
-    ]
-    
-    for path in possible_fonts:
-        if os.path.exists(path):
-            font_path = path
-            break
-    
+
+    font_path = find_font_path()
     if font_path is None:
         return PlainTextResponse(
             "No TTF font found on system. Please install Arial or DejaVuSans.",
             status_code=500,
         )
-    
-    # Binary search for largest font size that fits preview height
-    min_size = 10
-    max_size = preview_height
-    best_size = min_size
-    
-    # Cache font objects to avoid repeated loading
-    font_cache = {}
-    
-    while min_size <= max_size:
-        mid = (min_size + max_size) // 2
-        
-        if mid not in font_cache:
-            font_cache[mid] = ImageFont.truetype(font_path, mid)
-        
-        font = font_cache[mid]
-        dummy_img = Image.new("L", (10, 10))
-        dummy_draw = ImageDraw.Draw(dummy_img)
-        bbox = dummy_draw.textbbox((0, 0), text, font=font)
-        text_height = bbox[3] - bbox[1]
-        
-        if text_height <= preview_height * 0.95:
-            best_size = mid
-            min_size = mid + 1
-        else:
-            max_size = mid - 1
-    
-    # Create preview image with smaller dimensions
-    font = font_cache[best_size]
-    dummy_img = Image.new("L", (10, 10))
-    dummy_draw = ImageDraw.Draw(dummy_img)
-    bbox = dummy_draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    
-    temp_img = Image.new("RGBA", (text_width, text_height), (0, 0, 0, 0))
-    temp_draw = ImageDraw.Draw(temp_img)
-    temp_draw.text((-bbox[0], -bbox[1]), text, font=font, fill=fg)
 
-    # Create preview image
-    preview_image = Image.new("RGB", (max(text_width, preview_width), preview_height), bg)
-    x = (preview_image.width - text_width) // 2
-    y = (preview_height - text_height) // 2
-    preview_image.paste(temp_img, (x, y), mask=temp_img.split()[-1])
-    
-    # Save as JPEG for much faster encoding (PNG was taking ~0.8s)
+    preview_image = make_banner_image(text, height=288, font_path=font_path)
+
     buf = BytesIO()
     preview_image.save(buf, format="JPEG", quality=95, optimize=True)
     buf.seek(0)
-    
-    # Store image in memory with a token
+
     token = str(uuid.uuid4())
-    banner_images[token] = buf.getvalue()
-    
-    # Render HTML with image and print button
+    banner_images[token] = {"text": text, "font_path": font_path, "preview": buf.getvalue()}
+
     return templates.TemplateResponse(
         "banner_preview.html", {"request": request, "token": token}
     )
@@ -474,7 +457,30 @@ async def banner_preview(request: Request):
 
 @app.get("/banner/image")
 def banner_image(token: str):
-    img_bytes = banner_images.get(token)
-    if not img_bytes:
+    stored = banner_images.get(token)
+    if not stored:
         return PlainTextResponse("Image not found", status_code=404)
-    return StreamingResponse(BytesIO(img_bytes), media_type="image/jpeg")
+    return StreamingResponse(BytesIO(stored["preview"]), media_type="image/jpeg")
+
+
+@app.post("/banner/print")
+@handle_printer_exceptions
+async def banner_print(token: str = Form(...), printer=Depends(get_printer_instance)):
+    stored = banner_images.get(token)
+    if not stored:
+        return PlainTextResponse("Banner not found", status_code=404)
+
+    # Render at full print resolution (576px = thermal paper width)
+    banner_img = make_banner_image(stored["text"], height=576, font_path=stored["font_path"])
+
+    # Rotate 90° so the banner spools along the receipt length
+    banner_img = banner_img.rotate(90, expand=True)
+
+    thermal_img = prepare_thermal_image(banner_img, width=576)
+    print_image_and_text(printer, thermal_img, "")
+
+    if isinstance(printer, Dummy):
+        with open("output.escpos", "wb") as f:
+            f.write(printer.output)
+
+    return RedirectResponse(url="/?success=true&conversation_text=Banner+printed!", status_code=303)
